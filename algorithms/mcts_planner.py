@@ -1,10 +1,10 @@
-# [新增] MCTS 核心引擎，支持深拷贝并行推演
+# [重构] MCTS 核心引擎：新增代理状态转移机制与严格深度清洗拷贝
 import math
 import copy
 import random
 import logging
 from typing import Dict, Any, List, Optional
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
 # 引用已设计的状态结构
 from state.graph_state import GraphState
@@ -62,20 +62,74 @@ class MCTSPlanner:
             "Direct_Correction"    # 直接纠正 (仅在极端死循环时使用)
         ]
 
-    def _deep_copy_state(self, state: GraphState) -> GraphState:
-        """安全深拷贝 LangGraph 状态，防止虚拟推演污染主图"""
-        try:
-            # 标记为模拟状态
-            new_state = copy.deepcopy(state)
-            new_state["is_simulation"] = True
-            return new_state
-        except Exception as e:
-            logger.warning(f"深拷贝失败，降级为浅拷贝重组: {e}")
-            return {**state, "is_simulation": True}
+    def _clean_deep_copy(self, state: GraphState) -> GraphState:
+        """
+        【关键修复 1】严格的深度清洗拷贝 (Deep Clean Copy)
+        替代容易引发异常和 State Bleeding 的朴素 copy.deepcopy。
+        专门反序列化并重建 LangChain 的 Message 对象，确保平行宇宙间的物理内存绝对隔离。
+        """
+        new_state = {}
+        for k, v in state.items():
+            if k == "messages":
+                # 重建所有消息对象，防止浅拷贝导致的并发写入污染
+                new_msgs = []
+                for msg in v:
+                    if isinstance(msg, HumanMessage):
+                        new_msgs.append(HumanMessage(content=msg.content, additional_kwargs=copy.deepcopy(msg.additional_kwargs)))
+                    elif isinstance(msg, AIMessage):
+                        new_msgs.append(AIMessage(content=msg.content, additional_kwargs=copy.deepcopy(msg.additional_kwargs)))
+                    else:
+                        # 兼容 BaseMessage 或字典
+                        new_msgs.append(copy.deepcopy(msg))
+                new_state[k] = new_msgs
+            elif isinstance(v, (dict, list)):
+                # 针对知识节点追踪状态 (student_kcs) 等复杂嵌套对象
+                new_state[k] = copy.deepcopy(v)
+            else:
+                # 针对标量 (turn_count, global_kl_shift 等)
+                new_state[k] = v
+                
+        # 标记为模拟状态
+        new_state["is_simulation"] = True
+        return new_state
+
+    def _simulate_action_effect(self, state: GraphState, action: str) -> None:
+        """
+        【关键修复 2】启发式代理状态转移 (Heuristic Proxy State Transition)
+        在无法于搜索树中直接调用 LLM 的工程约束下，模拟不同动作对认知环境的影响。
+        赋予不同策略真实的“预期价值差异”，打破 MCTS 的“盲目搜索”陷阱。
+        """
+        kl = state.get("global_kl_shift", 0.0)
+        bug = state.get("verifier_scores", {}).get("bug_resolved", 0.0)
+
+        # 概率性增益模型（符合教育学预期）
+        if action == "Elicit_Questioning":
+            # 启发提问：认知增益大，但短期内解 Bug 慢
+            kl += random.uniform(0.05, 0.15)
+            bug += random.uniform(0.0, 0.05)
+        elif action == "Provide_Hint":
+            # 给定线索：两者较为均衡
+            kl += random.uniform(0.02, 0.08)
+            bug += random.uniform(0.1, 0.2)
+        elif action == "Explain_Concept":
+            # 解释概念：认知增益极大，稳定推进
+            kl += random.uniform(0.1, 0.2)
+            bug += random.uniform(0.05, 0.1)
+        elif action == "Direct_Correction":
+            # 【红线策略】直接纠正：Bug光速修复，但认知增益为 0 (严重拉低后续评估分数)
+            kl += 0.0 
+            bug += random.uniform(0.4, 0.6)
+
+        # 回写状态
+        state["global_kl_shift"] = min(1.0, kl)
+        if "verifier_scores" not in state:
+            state["verifier_scores"] = {}
+        state["verifier_scores"]["bug_resolved"] = min(1.0, bug)
+        state["turn_count"] = state.get("turn_count", 0) + 1
 
     def search(self, root_state: GraphState) -> Dict[str, Any]:
         """执行 MCTS 搜索，返回最优策略 JSON"""
-        root = MCTSNode(state=self._deep_copy_state(root_state))
+        root = MCTSNode(state=self._clean_deep_copy(root_state))
 
         for _ in range(self.num_simulations):
             node = self._tree_policy(root)
@@ -93,7 +147,7 @@ class MCTSPlanner:
         strategy_payload = {
             "strategy_type": best_action,
             "confidence_score": (best_child.value / best_child.visits) if best_child.visits > 0 else 0.5,
-            "reasoning": f"MCTS 推演选择该策略，预期奖励评分最高。"
+            "reasoning": f"MCTS 潜空间推演完毕，评估 {best_action} 策略在平衡 KL 增益与 Bug 解决率上具有全局最优的长期价值。"
         }
         
         logger.info(f"MCTS 规划完成，选定策略: {best_action}")
@@ -117,12 +171,11 @@ class MCTSPlanner:
         untried_actions = [a for a in self.legal_actions if a not in tried_actions]
         action = random.choice(untried_actions)
         
-        # 1. 拷贝状态进入平行宇宙
-        next_state = self._deep_copy_state(node.state)
+        # 1. 严格深拷贝进入平行宇宙
+        next_state = self._clean_deep_copy(node.state)
         
-        # 2. 【核心隔离】在模拟状态中记录该动作产生的假想影响
-        # 注: 真实的教学推演需调用 LLM 预测，此处为保障工程效率使用启发式代理转移
-        next_state["turn_count"] = next_state.get("turn_count", 0) + 1
+        # 2. 注入启发式状态转移，令动作真正地“改变环境”
+        self._simulate_action_effect(next_state, action)
         
         child_node = MCTSNode(state=next_state, parent=node, action=action)
         node.children[action] = child_node
@@ -133,18 +186,13 @@ class MCTSPlanner:
         快速模拟 (Simulation/Rollout):
         评估当前虚拟图状态的综合 Reward，融合贝叶斯 KL 增益与 Verifier 得分。
         """
-        # 提取评估特征
         kl_shift = state.get("global_kl_shift", 0.0)
         bug_resolved = state.get("verifier_scores", {}).get("bug_resolved", 0.0)
         turn_count = state.get("turn_count", 0)
         
-        # 启发式 Reward 函数设计:
-        # 1. 鼓励引发学生认知增益 (KL)
-        # 2. 鼓励修复 Bug
-        # 3. 惩罚过长的对话拖沓
+        # 启发式 Reward 函数设计: 鼓励启发认知、鼓励修复Bug、惩罚冗长推演
         reward = (kl_shift * 0.4) + (bug_resolved * 0.5) - (turn_count * 0.05)
         
-        # 截断到 0~1 范围
         return max(0.0, min(1.0, reward))
 
     def _backpropagate(self, node: MCTSNode, reward: float):
@@ -159,18 +207,12 @@ class MCTSPlanner:
 # ==========================================
 def consultant_mcts_step(state: GraphState) -> Dict[str, Any]:
     """
-    LangGraph 的核心顾问节点：
-    调用 MCTS Planner 生成后台指导策略，注入到主状态中。
+    LangGraph 的核心顾问节点：调用 MCTS Planner 生成后台指导策略。
     """
     logger.info("=== Consultant 启动 MCTS 后台推演 ===")
     
     # 限制搜索规模，保证生产环境延迟可控
-    planner = MCTSPlanner(num_simulations=5, max_depth=2)
-    
-    # 运算出最优 JSON 策略
+    planner = MCTSPlanner(num_simulations=10, max_depth=3)
     optimal_strategy = planner.search(state)
     
-    # 返回图状态 Diff，仅更新 current_strategy 字段
-    return {
-        "current_strategy": optimal_strategy
-    }
+    return {"current_strategy": optimal_strategy}

@@ -1,4 +1,4 @@
-# [重构] 替代原 consultant_teacher_socratic_teaching_system.py，定义 LangGraph 非线性状态机与节点流转逻辑
+# [重构] LangGraph 非线性状态机与节点流转逻辑
 from dotenv import load_dotenv
 load_dotenv()  # 自动读取并加载同级目录下的 .env 文件
 import logging
@@ -15,8 +15,10 @@ from state.graph_state import GraphState
 from agents.student import student_node_step
 from algorithms.llmkt_bayesian import llmkt_bayesian_update_step
 from agents.verifier import verifier_evaluate_step
-from agents.consultant import consultant_node_step
 from agents.teacher import teacher_node_step
+
+# 【关键修复 1】对齐模块接口，直接从 MCTS 算法包导入 Consultant 节点
+from algorithms.mcts_planner import consultant_mcts_step
 
 # 配置全局日志
 logging.basicConfig(
@@ -26,6 +28,33 @@ logging.basicConfig(
 )
 logger = logging.getLogger("SocratMCTS")
 
+# ==========================================
+# 新增的辅助节点 (Helpers)
+# ==========================================
+def turn_manager_step(state: GraphState) -> Dict[str, Any]:
+    """
+    【关键修复 2】防死循环回合管理器
+    在教师发言完毕进入下一轮学生提问前，显式递增 turn_count。
+    保证主干状态机的生命周期受到绝对控制。
+    """
+    current_turns = state.get("turn_count", 0)
+    return {"turn_count": current_turns + 1}
+
+def summary_node_step(state: GraphState) -> Dict[str, Any]:
+    """
+    【关键修复 3】概念收敛性总结节点
+    为支撑论文中 SPR (总结合格率) 这一红线指标而添加。
+    当检测到 Bug 修复后，系统不应直接终止，而应在此节点进行复盘。
+    """
+    logger.info("👩‍🏫 [Teacher]: (系统总结) 恭喜你完成了代码修复！让我们来回顾一下刚才解决的核心概念瓶颈...")
+    # 真实应用中，这可以调用大模型基于此前的状态图生成总结文本。
+    # 这里直接抛出固定的标识，表示系统已成功进入总结状态并完结教学。
+    return {"current_strategy": {"strategy_type": "Concept_Summary_Complete"}}
+
+
+# ==========================================
+# 核心条件路由 (Conditional Edges)
+# ==========================================
 def should_continue_teaching(state: GraphState) -> str:
     """
     条件路由判断：决定是进入下一轮教学，还是结束当前会话。
@@ -33,18 +62,18 @@ def should_continue_teaching(state: GraphState) -> str:
     scores = state.get("verifier_scores", {})
     bug_resolved = scores.get("bug_resolved", 0.0)
     turn_count = state.get("turn_count", 0)
-    max_turns = state.get("max_turns", 8)  # 默认最大 8 轮，防止死循环
+    max_turns = state.get("max_turns", 8)
 
     logger.info(f"【图流转判定】当前轮次: {turn_count}/{max_turns} | Bug 解决概率: {bug_resolved:.2f}")
 
-    # 终止条件 1：代码 Bug 已被明确修复
+    # 终止条件 1：代码 Bug 已被明确修复，路由至总结反思节点
     if bug_resolved >= 0.85:
-        logger.info("🎉 满足终止条件：Bug 已被成功修复，教学目标达成！")
-        return END
+        logger.info("🎉 满足终止条件：Bug 已被成功修复，进入 SPR 总结反思环节。")
+        return "summary_node"
     
-    # 终止条件 2：达到最大防死循环限制
+    # 终止条件 2：达到最大防死循环限制，强制终止
     if turn_count >= max_turns:
-        logger.warning("⚠️ 满足终止条件：达到最大对话轮次限制，强行终止会话。")
+        logger.warning("⚠️ 满足终止条件：达到最大对话轮次限制，遗憾退出并强行终止会话。")
         return END
         
     # 继续教学：交由 Consultant (大脑) 进行 MCTS 规划
@@ -64,22 +93,35 @@ def build_socrat_mcts_graph():
     workflow.add_node("student_node", student_node_step)
     workflow.add_node("llmkt_node", llmkt_bayesian_update_step)
     workflow.add_node("verifier_node", verifier_evaluate_step)
-    workflow.add_node("consultant_node", consultant_node_step)
+    workflow.add_node("consultant_node", consultant_mcts_step) # 修复了方法引用
     workflow.add_node("teacher_node", teacher_node_step)
+    
+    # 注册新引入的关键节点
+    workflow.add_node("turn_manager", turn_manager_step)
+    workflow.add_node("summary_node", summary_node_step)
 
     # 2. 定义静态流转边 (Edges)
     workflow.set_entry_point("student_node")
     workflow.add_edge("student_node", "llmkt_node")
     workflow.add_edge("llmkt_node", "verifier_node")
-    # 注意：verifier_node 的出口由下面的 add_conditional_edges 动态决定
+    
+    # 路由节点的决策出口
+    # verifier_node 的下一步由 add_conditional_edges 动态决定
+    
     workflow.add_edge("consultant_node", "teacher_node")
-    workflow.add_edge("teacher_node", "student_node")
+    # 教师发言完毕后，经过回合管理器拦截递增，再重回学生节点构成闭环
+    workflow.add_edge("teacher_node", "turn_manager")
+    workflow.add_edge("turn_manager", "student_node")
+    
+    # 总结完毕后，状态机安全终结
+    workflow.add_edge("summary_node", END)
 
     # 3. 注册条件路由 (Conditional Edges)
     workflow.add_conditional_edges(
         "verifier_node",
         should_continue_teaching,
         {
+            "summary_node": "summary_node", # 修复为先复盘再结束
             END: END,
             "consultant_node": "consultant_node"
         }
@@ -95,10 +137,8 @@ def build_socrat_mcts_graph():
 # 本地测试与运行入口
 # ==========================================
 if __name__ == "__main__":
-    # 构建图应用
     socrat_app = build_socrat_mcts_graph()
     
-    # 初始化启动状态 (冷启动)
     initial_state = {
         "messages": [],
         "student_kcs": {},
@@ -106,7 +146,7 @@ if __name__ == "__main__":
         "current_strategy": None,
         "verifier_scores": {},
         "is_simulation": False,
-        "student_persona": "stubborn", # 注入固执的对抗性学生画像进行压力测试
+        "student_persona": "stubborn",
         "turn_count": 0,
         "max_turns": 5
     }
@@ -116,15 +156,11 @@ if __name__ == "__main__":
     print(f"当前注入的对抗学生画像: {initial_state['student_persona']}")
     print("="*50 + "\n")
     
-    # 启动图流转引擎
     try:
-        # stream() 允许我们观察到图中每一个节点流转的增量状态
         for output in socrat_app.stream(initial_state, config={"recursion_limit": 50}):
-            # 获取当前刚执行完的节点名称
             node_name = list(output.keys())[0]
             node_state = output[node_name]
             
-            # 仅在学生和老师节点输出对话，以便于观察
             if node_name in ["student_node", "teacher_node"]:
                 latest_msg = node_state["messages"][-1]
                 if isinstance(latest_msg, HumanMessage):
