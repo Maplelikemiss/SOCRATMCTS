@@ -1,4 +1,4 @@
-# [新增] 统一管理 LangGraph 的 TypedDict/Pydantic 状态数据结构
+# [重构] 统一管理 LangGraph 的 TypedDict/Pydantic 状态数据结构
 from typing import Annotated, TypedDict, List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from langchain_core.messages import BaseMessage
@@ -6,6 +6,25 @@ from langchain_core.messages import BaseMessage
 def add_messages(left: List[BaseMessage], right: List[BaseMessage]) -> List[BaseMessage]:
     """LangGraph 规约：状态中的 messages 必须是追加 (append) 而不是覆盖"""
     return left + right
+
+def merge_kcs(left: Dict[str, 'BayesianKnowledgeState'], right: Dict[str, 'BayesianKnowledgeState']) -> Dict[str, 'BayesianKnowledgeState']:
+    """
+    【关键修复】知识状态字典的归约器 (Reducer)
+    LangGraph 默认会覆写没有 Annotated 的字段。
+    此 Reducer 确保不同节点或并发 MCTS 探索返回的局部 KCs 更新能够安全地合并到主图状态中，
+    防止出现状态擦除 (State Erasing) 的致命 Bug。
+    """
+    if not left:
+        left = {}
+    if not right:
+        right = {}
+    
+    # 浅拷贝合并，因为内部的 BayesianKnowledgeState 在更新时
+    # (参见 llmkt_bayesian.py) 会被 pydantic 的 model_copy() 深拷贝替换，
+    # 配合字典浅拷贝合并，完美兼顾了并发安全与内存效率。
+    merged = left.copy()
+    merged.update(right)
+    return merged
 
 class BayesianKnowledgeState(BaseModel):
     """连续贝叶斯知识追踪 (LLMKT) 的微观状态"""
@@ -20,7 +39,8 @@ class GraphState(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
     
     # 2. 认知追踪与推演状态
-    student_kcs: Dict[str, BayesianKnowledgeState]
+    # 【关键修复】引入 merge_kcs 归约器，杜绝字典被整体覆写
+    student_kcs: Annotated[Dict[str, BayesianKnowledgeState], merge_kcs]
     global_kl_shift: float
     current_strategy: Optional[Dict[str, Any]]
     
