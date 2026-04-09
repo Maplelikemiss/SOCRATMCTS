@@ -94,7 +94,9 @@ class StudentAgent:
 def student_node_step(state: GraphState) -> Dict[str, Any]:
     """
     LangGraph 学生节点：
-    模拟学生回复，并维护全局的轮次计数器 (turn_count)。
+    模拟学生回复。
+    【修复说明】移除了旧版本的 turn_count 递增逻辑。
+    现在的生命周期计数统一交由图中的 `turn_manager` 节点负责，防止了双重递增导致评估测试提前中断的致命 Bug。
     """
     logger.info(f"=== Student 节点开始运行 (当前画像: {state.get('student_persona', 'normal')}) ===")
     
@@ -106,11 +108,7 @@ def student_node_step(state: GraphState) -> Dict[str, Any]:
     
     logger.debug(f"Student 回复: {response_text}")
     
-    # 更新轮次计数器 (防死循环机制的核心)
-    current_turn = state.get("turn_count", 0)
-    
-    # 增量更新返回
+    # 【关键修复】删除这里的 current_turn 获取和递增操作，只返回消息更新
     return {
-        "messages": [human_message],
-        "turn_count": current_turn + 1
+        "messages": [human_message]
     }

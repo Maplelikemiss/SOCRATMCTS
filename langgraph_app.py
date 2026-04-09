@@ -1,4 +1,4 @@
-# [重构] LangGraph 非线性状态机与节点流转逻辑
+# [修复] LangGraph 非线性状态机与节点流转逻辑
 from dotenv import load_dotenv
 load_dotenv()  # 自动读取并加载同级目录下的 .env 文件
 import logging
@@ -17,8 +17,9 @@ from algorithms.llmkt_bayesian import llmkt_bayesian_update_step
 from agents.verifier import verifier_evaluate_step
 from agents.teacher import teacher_node_step
 
-# 【关键修复 1】对齐模块接口，直接从 MCTS 算法包导入 Consultant 节点
-from algorithms.mcts_planner import consultant_mcts_step
+# 【关键修复 1】纠正导入路径：导入真正封装了大模型推理与 MCTS 调用的 Consultant Agent 节点，
+# 而不是仅仅导入底层无状态的 MCTS 纯算法步骤。这样才能保证 tactical_draft 的生成。
+from agents.consultant import consultant_node_step
 
 # 配置全局日志
 logging.basicConfig(
@@ -33,7 +34,7 @@ logger = logging.getLogger("SocratMCTS")
 # ==========================================
 def turn_manager_step(state: GraphState) -> Dict[str, Any]:
     """
-    【关键修复 2】防死循环回合管理器
+    防死循环回合管理器
     在教师发言完毕进入下一轮学生提问前，显式递增 turn_count。
     保证主干状态机的生命周期受到绝对控制。
     """
@@ -42,7 +43,7 @@ def turn_manager_step(state: GraphState) -> Dict[str, Any]:
 
 def summary_node_step(state: GraphState) -> Dict[str, Any]:
     """
-    【关键修复 3】概念收敛性总结节点
+    概念收敛性总结节点
     为支撑论文中 SPR (总结合格率) 这一红线指标而添加。
     当检测到 Bug 修复后，系统不应直接终止，而应在此节点进行复盘。
     """
@@ -93,7 +94,10 @@ def build_socrat_mcts_graph():
     workflow.add_node("student_node", student_node_step)
     workflow.add_node("llmkt_node", llmkt_bayesian_update_step)
     workflow.add_node("verifier_node", verifier_evaluate_step)
-    workflow.add_node("consultant_node", consultant_mcts_step) # 修复了方法引用
+    
+    # 【关键修复 1 延续】将状态图的 consultant_node 正确绑定至 consultant_node_step
+    workflow.add_node("consultant_node", consultant_node_step) 
+    
     workflow.add_node("teacher_node", teacher_node_step)
     
     # 注册新引入的关键节点
@@ -121,7 +125,7 @@ def build_socrat_mcts_graph():
         "verifier_node",
         should_continue_teaching,
         {
-            "summary_node": "summary_node", # 修复为先复盘再结束
+            "summary_node": "summary_node", 
             END: END,
             "consultant_node": "consultant_node"
         }

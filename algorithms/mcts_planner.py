@@ -1,4 +1,4 @@
-# [重构] MCTS 核心引擎：新增代理状态转移机制与严格深度清洗拷贝
+# [重构] MCTS 核心引擎：新增代理状态转移机制与严格深度清洗拷贝 (修复 Pydantic 兼容性)
 import math
 import copy
 import random
@@ -69,8 +69,8 @@ class MCTSPlanner:
     def _clean_deep_copy(self, state: GraphState) -> GraphState:
         """
         【关键修复 2】极其严格的深度清洗拷贝 (Deep Clean Copy)
-        替代容易引发异常和 State Bleeding 的朴素 copy.deepcopy。
-        专门反序列化并重建 LangChain 的各种 Message 对象，确保平行宇宙间的物理内存绝对隔离。
+        专门反序列化并重建 LangChain 的各种 Message 对象与 Pydantic 状态。
+        兼容 Pydantic V2 API，彻底防止平行宇宙间的物理内存重叠。
         """
         new_state = {}
         for k, v in state.items():
@@ -91,15 +91,30 @@ class MCTSPlanner:
                         t_id = getattr(msg, 'tool_call_id', '')
                         new_msgs.append(ToolMessage(content=msg.content, tool_call_id=t_id, additional_kwargs=msg_kwargs))
                     else:
-                        # 终极兜底方案：通过 Pydantic 字典导出与解包重建，彻底斩断底层引用
+                        # 终极兜底方案：兼容 Pydantic V2 与 V1
                         try:
-                            new_msgs.append(msg.__class__(**msg.dict()))
+                            if hasattr(msg, "model_dump"):
+                                # Pydantic V2 规范 API
+                                new_msgs.append(msg.__class__(**msg.model_dump()))
+                            else:
+                                # Pydantic V1 遗留 API
+                                new_msgs.append(msg.__class__(**msg.dict()))
                         except Exception:
                             # 极端情况下的安全降级
                             new_msgs.append(copy.deepcopy(msg))
                 new_state[k] = new_msgs
+            elif k == "student_kcs" and isinstance(v, dict):
+                # 【核心修复】专门针对 Pydantic 知识节点对象的安全拷贝
+                new_kcs = {}
+                for kc_id, kc_state in v.items():
+                    if hasattr(kc_state, "model_copy"):
+                        # Pydantic V2 的安全原生深拷贝方法
+                        new_kcs[kc_id] = kc_state.model_copy(deep=True)
+                    else:
+                        new_kcs[kc_id] = copy.deepcopy(kc_state)
+                new_state[k] = new_kcs
             elif isinstance(v, (dict, list)):
-                # 针对知识节点追踪状态 (student_kcs) 等复杂嵌套对象
+                # 针对普通标量嵌套对象
                 new_state[k] = copy.deepcopy(v)
             else:
                 # 针对标量 (turn_count, global_kl_shift 等)
