@@ -42,15 +42,16 @@ class ConsultantAgent:
     """
     def __init__(self, model_name: str = "gpt-4o-mini", temperature: float = 0.2):
         # 初始化结构化输出的 LLM (要求环境配置好 OPENAI_API_KEY)
-        self.llm = ChatOpenAI(model=model_name, temperature=temperature)
-        '''
+        #self.llm = ChatOpenAI(model=model_name, temperature=temperature)
+        
         self.llm = ChatOpenAI(
-            model_name="qwen-2.5-72b-instruct", 
+            model_name="llama-3.3", 
             temperature=0.4,
-            api_key="你的开源模型API_KEY或者随便填", 
-            base_url="http://localhost:8000/v1"  # 指向你的本地 vLLM 或其他服务商地址
+            api_key="vllm-local-service", 
+            max_tokens=800,          # 【核心修复】加上这个！强制最多只准生成800个字
+            base_url="http://192.168.123.8:8000/v1"  # 指向你的本地 vLLM 或其他服务商地址
         )
-        '''
+        
         self.structured_llm = self.llm.with_structured_output(ConsultantStrategyPayload)
         
         # Consultant 的系统提示词：核心在于“幕后指挥”
@@ -62,6 +63,9 @@ class ConsultantAgent:
         注意：你不是直接和学生对话的人！你的输出将被送给前台的 Teacher 智能体。
         你必须提供清晰的战术线索 (tactical_draft)，告诉 Teacher 下一步该反问什么，或者提示什么。
         绝对不要生成直接修复代码的代码块，除非 MCTS 明确指令为 'Direct_Correction'。
+
+        【极其严格的红线要求】
+        请只输出合法的 JSON 格式对象！绝对不要包含任何前导语、结束语或 ```json 这样的 Markdown 标记！务必保持语言简练！
         """
 
     def generate_strategy(self, state: GraphState, mcts_action: str) -> Dict[str, Any]:

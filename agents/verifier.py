@@ -4,7 +4,10 @@ from typing import Dict, Any
 from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-
+import dotenv
+import os
+dotenv.load_dotenv()
+os.environ["DASHSCOPE_API_KEY"] = os.getenv("DASHSCOPE_API_KEY")
 # 引用全局状态定义
 from state.graph_state import GraphState
 
@@ -62,15 +65,15 @@ class VerifierAgent:
     """
     def __init__(self, model_name: str = "gpt-4o", temperature: float = 0.0):
         # 裁判需要绝对客观，temperature 必须为 0.0
-        self.llm = ChatOpenAI(model=model_name, temperature=temperature)
-        '''
+        #self.llm = ChatOpenAI(model=model_name, temperature=temperature)
+        
         self.llm = ChatOpenAI(
-            model_name="qwen-2.5-72b-instruct", 
+            model_name="qwen3.5-plus", 
             temperature=0.4,
-            api_key="你的开源模型API_KEY或者随便填", 
-            base_url="http://localhost:8000/v1"  # 指向你的本地 vLLM 或其他服务商地址
+            api_key=os.getenv("DASHSCOPE_API_KEY"), 
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"  # 指向你的本地 vLLM 或其他服务商地址
         )
-        '''
+        
         self.structured_llm = self.llm.with_structured_output(NineDimEvaluation)
         
         self.system_prompt = """
@@ -81,6 +84,8 @@ class VerifierAgent:
         1. 所有的打分必须严格介于 0.0 到 1.0 之间。
         2. 如果发现 Teacher 越权，直接给出了带有正确修复结果的代码块，`socratic_guidance` 和 `cognitive_struggle` 必须打极低分（< 0.2）。
         3. 只有当 Student 在最新的回复中明确给出了正确的思路或正确的代码时，`bug_resolved` 才能打高分（>= 0.85），否则即使 Teacher 给了答案，只要学生没反馈学会，bug 就不算被解决！
+        
+        请务必以 JSON 格式输出你的评估结果。
         """
 
     def evaluate(self, state: GraphState) -> Dict[str, float]:

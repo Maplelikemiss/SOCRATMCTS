@@ -17,15 +17,15 @@ class TeacherAgent:
     """
     def __init__(self, model_name: str = "gpt-4o", temperature: float = 0.4):
         # Teacher 需要更好的语言表现力，temperature 可以稍微调高一点，增加亲和力
-        self.llm = ChatOpenAI(model=model_name, temperature=temperature)
-        '''
+        #self.llm = ChatOpenAI(model=model_name, temperature=temperature)
+        
         self.llm = ChatOpenAI(
-            model_name="qwen-2.5-72b-instruct", 
+            model_name="socrat-teacher-glm4", 
             temperature=0.4,
-            api_key="你的开源模型API_KEY或者随便填", 
-            base_url="http://localhost:8000/v1"  # 指向你的本地 vLLM 或其他服务商地址
+            api_key="EMPTY", 
+            base_url="http://127.0.0.1:8000/v1"  # 指向你的本地 vLLM 或其他服务商地址
         )
-        '''
+        
         # 强约束系统提示词，坚决防止越权提供答案
         self.system_prompt = """
         你是一位经验丰富、充满耐心的资深编程导师（Teacher）。

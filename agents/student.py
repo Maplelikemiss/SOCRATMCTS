@@ -16,15 +16,15 @@ class StudentAgent:
     """
     def __init__(self, model_name: str = "gpt-4o-mini", temperature: float = 0.7):
         # 学生的 temperature 较高，以产生更多样化、更不可控的对抗性回复
-        self.llm = ChatOpenAI(model=model_name, temperature=temperature)
-        '''
+        #self.llm = ChatOpenAI(model=model_name, temperature=temperature)
+        
         self.llm = ChatOpenAI(
-            model_name="qwen-2.5-72b-instruct", 
+            model_name="llama-3-8b-instruct", 
             temperature=0.4,
-            api_key="你的开源模型API_KEY或者随便填", 
-            base_url="http://localhost:8000/v1"  # 指向你的本地 vLLM 或其他服务商地址
+            api_key="EMPTY", 
+            base_url="http://127.0.0.1:8001/v1"  # 指向你的本地 vLLM 或其他服务商地址
         )
-        '''
+        
         # 定义四种核心测试画像 (对应论文中的不同实验分组)
         self.personas = {
             "normal": (

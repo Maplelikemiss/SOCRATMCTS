@@ -4,7 +4,7 @@ load_dotenv()  # 自动读取并加载同级目录下的 .env 文件
 import logging
 import sys
 from typing import Dict, Any
-
+import os
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, AIMessage
 
