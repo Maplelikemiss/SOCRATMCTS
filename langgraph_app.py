@@ -150,7 +150,7 @@ if __name__ == "__main__":
         "current_strategy": None,
         "verifier_scores": {},
         "is_simulation": False,
-        "student_persona": "stubborn",
+        "student_persona": "normal",
         "turn_count": 0,
         "max_turns": 5
     }

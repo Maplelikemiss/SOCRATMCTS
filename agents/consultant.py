@@ -4,7 +4,10 @@ from typing import Dict, Any
 from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-
+import dotenv
+import os
+dotenv.load_dotenv()
+os.environ["DASHSCOPE_API_KEY"] = os.getenv("DASHSCOPE_API_KEY")
 # 引用之前定义的模块
 from state.graph_state import GraphState
 from algorithms.mcts_planner import MCTSPlanner
@@ -43,7 +46,7 @@ class ConsultantAgent:
     def __init__(self, model_name: str = "gpt-4o-mini", temperature: float = 0.2):
         # 初始化结构化输出的 LLM (要求环境配置好 OPENAI_API_KEY)
         #self.llm = ChatOpenAI(model=model_name, temperature=temperature)
-        
+        '''
         self.llm = ChatOpenAI(
             model_name="llama-3.3", 
             temperature=0.4,
@@ -51,7 +54,13 @@ class ConsultantAgent:
             max_tokens=800,          # 【核心修复】加上这个！强制最多只准生成800个字
             base_url="http://192.168.123.8:8000/v1"  # 指向你的本地 vLLM 或其他服务商地址
         )
-        
+        '''
+        self.llm = ChatOpenAI(
+            model_name="qwen3.5-plus", 
+            temperature=0.4,
+            api_key=os.getenv("DASHSCOPE_API_KEY"), 
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"  # 指向你的本地 vLLM 或其他服务商地址
+        )
         self.structured_llm = self.llm.with_structured_output(ConsultantStrategyPayload)
         
         # Consultant 的系统提示词：核心在于“幕后指挥”
@@ -65,7 +74,16 @@ class ConsultantAgent:
         绝对不要生成直接修复代码的代码块，除非 MCTS 明确指令为 'Direct_Correction'。
 
         【极其严格的红线要求】
-        请只输出合法的 JSON 格式对象！绝对不要包含任何前导语、结束语或 ```json 这样的 Markdown 标记！务必保持语言简练！
+        请只输出合法的 JSON 格式对象！绝对不要包含任何前导语、结束语或 ```json 这样的 Markdown 标记！
+        你的 JSON 必须且只能包含以下 4 个完全一致的 Key，不能修改任何一个字母（以下为格式示例，注意转义）：
+        {{
+            "strategy_type": "必须填入 MCTS 规划的动作名称",
+            "focus_kc_id": "填入相关的知识组件 ID",
+            "internal_reasoning": "填写后台推演逻辑",
+            "tactical_draft": "填写具体的战术草案"
+        }}
+        
+        绝对禁止输出类似 {{"action_mode": "...", "reason": "..."}} 这样篡改键名的格式！
         """
 
     def generate_strategy(self, state: GraphState, mcts_action: str) -> Dict[str, Any]:
