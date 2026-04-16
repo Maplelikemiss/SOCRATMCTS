@@ -84,6 +84,10 @@ class ConsultantAgent:
         }}
         
         绝对禁止输出类似 {{"action_mode": "...", "reason": "..."}} 这样篡改键名的格式！
+
+        【新增严格约束】：
+        在编写 "tactical_draft" 时，【绝对不允许】包含任何具体的 Python 代码！
+        你的草案只能是自然语言的指导策略（例如：“请反问学生列表长度和最大索引之间的数学关系”）。
         """
 
     def generate_strategy(self, state: GraphState, mcts_action: str) -> Dict[str, Any]:
@@ -145,7 +149,7 @@ def consultant_node_step(state: GraphState) -> Dict[str, Any]:
     logger.info("=== Consultant 节点开始运作 ===")
     
     # 步骤 1: 蒙特卡洛树搜索 (纯算法推演)
-    planner = MCTSPlanner(num_simulations=5, max_depth=2)
+    planner = MCTSPlanner(num_simulations=6, max_depth=3)
     mcts_result = planner.search(state)
     best_action = mcts_result.get("strategy_type", "Elicit_Questioning")
     

@@ -74,9 +74,12 @@ def _extract_llm_observation(messages: List[BaseMessage], kc_id: str) -> float:
     last_message = messages[-1].content.lower()
     
     # 启发式模拟：根据学生语言中的关键词映射概率
-    if "不知道" in last_message or "不懂" in last_message or "报错" in last_message:
+    negative_words = ["不知道", "不懂", "报错", "don't know", "not sure", "error", "confused"]
+    positive_words = ["原来如此", "明白了", "修复", "i understand", "i see", "i think i know", "am i right", "fixed", "got it"]
+    
+    if any(word in last_message for word in negative_words):
         return 0.1
-    elif "原来如此" in last_message or "明白了" in last_message or "修复" in last_message:
+    elif any(word in last_message for word in positive_words):
         return 0.85
     
     return 0.5  # 默认中性观测，表示当前对话未涉及该知识点或信息模糊

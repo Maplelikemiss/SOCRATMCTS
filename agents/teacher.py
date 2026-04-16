@@ -80,7 +80,23 @@ class TeacherAgent:
                 "reasoning": strategy.get("internal_reasoning"),
                 "tactical_draft": strategy.get("tactical_draft")
             })
-            return response_msg.content
+            
+            content = response_msg.content
+            
+            # 【新增逻辑：暴力拦截代码块】
+            # 只要不是 MCTS 明确下令的 Direct_Correction，一律没收代码
+            if strategy.get("strategy_type") != "Direct_Correction":
+                if "```" in content:
+                    logger.warning("🚨 触发红线：Teacher 试图输出代码块，已执行正则抹除！")
+                    # 使用正则将 markdown 代码块替换为苏格拉底式的引导留白
+                    content = re.sub(
+                        r'```[a-zA-Z]*\n.*?```', 
+                        '\n*(老师原本想直接把代码写给你，但为了检验你的理解，请你根据刚才的提示，自己尝试把这行代码敲出来看看？)*\n', 
+                        content, 
+                        flags=re.DOTALL
+                    )
+                    
+            return content
             
         except Exception as e:
             logger.error(f"Teacher 文本生成失败: {e}")

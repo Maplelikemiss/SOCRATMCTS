@@ -2,7 +2,7 @@
 from typing import Annotated, TypedDict, List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from langchain_core.messages import BaseMessage
-
+import operator # 【新增导入】
 def add_messages(left: List[BaseMessage], right: List[BaseMessage]) -> List[BaseMessage]:
     """LangGraph 规约：状态中的 messages 必须是追加 (append) 而不是覆盖"""
     return left + right
@@ -44,6 +44,9 @@ class GraphState(TypedDict):
     global_kl_shift: float
     current_strategy: Optional[Dict[str, Any]]
     
+    # 【修复这一行：增加 operator.add 累加器】
+    global_kl_shift: Annotated[float, operator.add]
+
     # 3. 评估指标
     verifier_scores: Dict[str, float]
     

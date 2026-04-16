@@ -152,6 +152,7 @@ class MCTSPlanner:
             # 【红线策略】直接纠正：Bug光速修复，但认知增益为 0
             kl += 0.0 
             bug += noise(0.50, 0.05)
+            state["used_direct_correction"] = True
 
         # 回写状态，确保在合法的 0-1 概率空间内
         state["global_kl_shift"] = min(1.0, max(0.0, kl))
@@ -216,6 +217,11 @@ class MCTSPlanner:
         
         # 启发式 Reward 函数设计: 鼓励启发认知、鼓励修复Bug、惩罚冗长推演
         reward = (kl_shift * 0.4) + (bug_resolved * 0.5) - (turn_count * 0.05)
+
+        # 【新增逻辑】对直接给答案的路径进行毁灭性打击
+        # 扣除 0.6 分，使得走这条路的 MCTS 分支价值立刻低于 Elicit_Questioning
+        if state.get("used_direct_correction", False):
+            reward -= 0.6
         
         return max(0.0, min(1.0, reward))
 

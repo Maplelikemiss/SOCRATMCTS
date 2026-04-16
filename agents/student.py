@@ -52,12 +52,31 @@ class StudentAgent:
         """
         基于当前对话历史和指定的学生画像生成回复。
         """
-        # 1. 提取画像配置 (默认是正常学生)
-        persona_key = state.get("student_persona", "normal")
-        persona_prompt = self.personas.get(persona_key, self.personas["normal"])
         messages = state.get("messages", [])
+        # 这里的 persona_key 实际上是 utils.py 注入的带背景长文本
+        full_persona_text = state.get("student_persona", "normal")
+        
+        # ==========================================
+        # 核心拦截逻辑：绝对保证第一轮 100% 抛出原题代码
+        # ==========================================
+        if not messages:
+            logger.info("Student: 识别为第一轮对话，启用 Python 级强制代码注入，绕过大模型幻觉。")
+            if "【强制任务背景" in full_persona_text:
+                # 提取【强制任务背景 - 请严格遵守】之后的所有内容（即真实的题目和代码）
+                task_bg = full_persona_text.split("【强制任务背景 - 请严格遵守】")[1].strip()
+                # 使用固定的自然语言前缀包装，确保评测起点的绝对稳定
+                return f"Teacher, I'm having a problem with my code and it's driving me crazy. Here is what I am working on:\n\n{task_bg}"
+            else:
+                return "Hi Teacher, my code has a bug and I don't know how to fix it."
 
-        # 2. 动态构建系统提示词
+        # ==========================================
+        # 后续轮次：正常走大模型角色扮演生成逻辑
+        # ==========================================
+        # 修复画像提取：从带有背景的长文本中，切分出真正的基础画像键名 (如 'stubborn', 'zero_base')
+        base_persona_name = full_persona_text.split("\n")[0].strip() if "\n" in full_persona_text else full_persona_text
+        persona_prompt = self.personas.get(base_persona_name, self.personas["normal"])
+        
+        # 动态构建系统提示词 (移除了第一轮的强制引导，因为已经由上方 Python 逻辑接管)
         system_instruction = f"""
         【你的角色设定】
         {persona_prompt}
@@ -68,7 +87,8 @@ class StudentAgent:
         【严格规则】
         1. 永远不要扮演老师，你只是一个来寻求帮助（或捣乱）的学生。
         2. 回复要极其简短，符合人类日常聊天习惯（通常 1-3 句话）。
-        3. 如果这是第一轮对话（没有历史消息），请主动给出一个有 Bug 的代码片段（例如 Python 列表越界或死循环），并向老师求助。
+        3. 专注当前问题：严格针对老师指出的代码逻辑进行讨论，绝对不要凭空捏造或幻想出原代码中不存在的新 Bug 报错。
+        4. 【强制格式】：如果你在老师的引导下找出了正确的逻辑，你的回复必须严格以“我明白了！”这四个字开头，然后换行使用 ```python 标签写出你完整修改后的正确代码。不要有例外！
         """
 
         prompt = ChatPromptTemplate.from_messages([

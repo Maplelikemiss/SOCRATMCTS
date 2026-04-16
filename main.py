@@ -117,7 +117,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SocratMCTS 批量评估引擎")
     parser.add_argument("--dataset", type=str, default="SocratDataset.json", help="数据集 JSON 文件路径")
     parser.add_argument("--output", type=str, default="evaluation_results/final_report.json", help="结果输出路径")
-    parser.add_argument("--sample_size", type=int, default=2, help="限制测试样本量 (-1 表示全量测试)")
+    parser.add_argument("--sample_size", type=int, default=1, help="限制测试样本量 (-1 表示全量测试)")
     args = parser.parse_args()
     
     # 确保当前工作目录下有一个示例数据集，如果没有则给出友好提示
@@ -143,5 +143,6 @@ if __name__ == "__main__":
         dataset_path=args.dataset,
         output_path=args.output,
         sample_size=args.sample_size,
-        personas_to_test=["normal", "stubborn"] # 演示模式下仅跑两种典型画像
+        #personas_to_test=["normal", "stubborn"] # 演示模式下仅跑两种典型画像
+        personas_to_test=["normal"]
     )

@@ -22,39 +22,39 @@ class NineDimEvaluation(BaseModel):
     这些维度将共同支撑 MCTS 的 Default Policy (Rollout) 与图的终止判断
     """
     bug_resolved: float = Field(
-        default=0.0, 
+        ..., # <--- 注意这里的三个点，代表“强制必填，无默认值”
         description="核心指标：Bug 是否已被学生自行修复或代码已经正确？(0=未修复, 1=已完全修复)"
     )
     student_understanding_score: float = Field(
-        default=0.5, 
+        ..., 
         description="学生当前对核心知识点的理解程度 (这可以反哺 LLMKT 的观测更新)"
     )
     socratic_guidance: float = Field(
-        default=0.5, 
+        ..., 
         description="教师是否坚持了苏格拉底式启发？(0=直接给答案, 1=完美的提问与启发)"
     )
     tone_and_empathy: float = Field(
-        default=0.5, 
+        ..., 
         description="教师回复的语气亲和力与同理心，是否缓解了学生的焦虑"
     )
     clarity: float = Field(
-        default=0.5, 
+        ..., 
         description="教师表达的清晰度与准确性"
     )
     relevance: float = Field(
-        default=0.5, 
+        ..., 
         description="对话内容与当前 Bug / 知识点的相关性，是否跑题"
     )
     engagement: float = Field(
-        default=0.5, 
+        ..., 
         description="学生的参与度与积极性"
     )
     cognitive_struggle: float = Field(
-        default=0.5, 
+        ..., 
         description="学生是否正在经历良性的认知挣扎 (直接给答案得0分，一直循环提问导致烦躁也得低分)"
     )
     independence: float = Field(
-        default=0.0, 
+        ..., 
         description="学生独立解决问题的倾向性与实际表现"
     )
 
@@ -84,6 +84,11 @@ class VerifierAgent:
         1. 所有的打分必须严格介于 0.0 到 1.0 之间。
         2. 如果发现 Teacher 越权，直接给出了带有正确修复结果的代码块，`socratic_guidance` 和 `cognitive_struggle` 必须打极低分（< 0.2）。
         3. 只有当 Student 在最新的回复中明确给出了正确的思路或正确的代码时，`bug_resolved` 才能打高分（>= 0.85），否则即使 Teacher 给了答案，只要学生没反馈学会，bug 就不算被解决！
+        4. 【独立性高分条件】：如果学生在最新的回复中，能够准确用语言描述出正确的代码修改逻辑（比如准确指出了正确的函数用法或循环范围），或者直接输出了包含修复逻辑的完整代码块，这都说明学生具备了独立思考能力，请务必给 `independence`（独立性）打高分（>= 0.85）！
+        5. 【全面评估要求 - 绝不敷衍】：你现在被强制要求输出全部 9 个维度的具体分数，绝对禁止使用 0.5 作为没有任何思考的偷懒底分！请严格根据对话状态给出具体的浮点数（如 0.2, 0.75, 0.9 等）：
+           - 对于 `student_understanding_score`（学生理解度）：根据学生最新回复展现出的逻辑清晰度打分。如果学生完全懵懂或胡言乱语打低分，思路清晰或能顺着老师引导推理打高分。
+           - 对于 `engagement`（参与度）：如果学生只是敷衍回答“不懂”、“直接给我代码”，打低分；如果学生积极思考、输出长句子甚至主动提出疑问，打高分。
+           - 对于 `clarity`、`relevance` 和 `tone_and_empathy`：请根据 Teacher 的表达条理性、是否紧扣代码本身、语气是否具有鼓励性进行真实评估。
         
         请务必以 JSON 格式输出你的评估结果。
         """
