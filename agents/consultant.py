@@ -46,12 +46,12 @@ class ConsultantAgent:
     def __init__(self, model_name: str = "gpt-4o-mini", temperature: float = 0.2):
         # 初始化结构化输出的 LLM (要求环境配置好 OPENAI_API_KEY)
         #self.llm = ChatOpenAI(model=model_name, temperature=temperature)
-        '''
+        
         self.llm = ChatOpenAI(
             model_name="llama-3.3", 
             temperature=0.4,
             api_key="vllm-local-service", 
-            max_tokens=800,          # 【核心修复】加上这个！强制最多只准生成800个字
+            #max_tokens=800,          # 【核心修复】加上这个！强制最多只准生成800个字
             base_url="http://192.168.123.8:8000/v1"  # 指向你的本地 vLLM 或其他服务商地址
         )
         '''
@@ -61,6 +61,7 @@ class ConsultantAgent:
             api_key=os.getenv("DASHSCOPE_API_KEY"), 
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"  # 指向你的本地 vLLM 或其他服务商地址
         )
+        '''
         self.structured_llm = self.llm.with_structured_output(ConsultantStrategyPayload)
         
         # Consultant 的系统提示词：核心在于“幕后指挥”

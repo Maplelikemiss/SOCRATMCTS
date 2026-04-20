@@ -89,7 +89,7 @@ def _extract_llm_observation(messages: List[BaseMessage], kc_id: str) -> float:
         model_name="llama-3-8b-instruct", # 此处可替换为 Qwen 等其他本地模型
         temperature=0.0, # 必须是0，保证打分稳定性
         api_key="EMPTY", 
-        base_url="http://127.0.0.1:8001/v1",
+        base_url="http://192.168.123.8:8001/v1",
         max_tokens=50 # 限制长度，防止模型长篇大论
     )
     

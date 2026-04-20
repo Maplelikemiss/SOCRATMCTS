@@ -1,12 +1,16 @@
-# [重构] MCTS 核心引擎：新增代理状态转移机制与严格深度清洗拷贝 (修复 Pydantic 兼容性)
+# [重构] MCTS 核心引擎：新增角色互换(Role-Reversal)，引入 Asyncio 并发与虚拟大模型推演以激活 vLLM APC
 import math
 import copy
 import random
 import logging
+import asyncio
+import re
+import os
 from typing import Dict, Any, List, Optional
 
-# 【关键修复 2】引入更全面的 LangChain 消息基类，防范多智能体环境下的特殊消息类型
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage, ToolMessage
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 # 引用已设计的状态结构
 from state.graph_state import GraphState
@@ -28,7 +32,7 @@ class MCTSNode:
         return len(self.children) == len(legal_actions)
 
     def best_child(self, exploration_weight: float) -> 'MCTSNode':
-        """使用 UCT (UCB1) 算法选择最优子节点 (去除了硬编码，由外部传入探索权重)"""
+        """使用 UCT (UCB1) 算法选择最优子节点"""
         best_score = -float('inf')
         best_node = None
         
@@ -50,148 +54,128 @@ class MCTSNode:
 class MCTSPlanner:
     """
     针对苏格拉底式教学优化的 MCTS 规划器
-    通过评估 KL散度增益 与 Bug解决率，搜索最优教学动作序列。
+    【重构亮点】：支持 Root Parallelization (根节点并发) 和虚拟大模型代理推演
     """
-    # 【关键修复 1】暴露 exploration_weight (UCT 常数 C) 用于开发集调优
-    def __init__(self, num_simulations: int = 5, max_depth: int = 3, exploration_weight: float = 1.414):
-        self.num_simulations = num_simulations
+    def __init__(self, num_trees: int = 4, simulations_per_tree: int = 3, max_depth: int = 2, exploration_weight: float = 1.414):
+        # 将原本的 num_simulations 拆分为 num_trees (并发数) 和 simulations_per_tree (每棵树深度搜索次数)
+        self.num_trees = num_trees
+        self.simulations_per_tree = simulations_per_tree
         self.max_depth = max_depth
         self.exploration_weight = exploration_weight
         
-        # 预定义合法的苏格拉底教学动作空间 (Action Space)
+        # 【修复 1】扩充合法的苏格拉底教学动作空间 (引入 Role_Reversal)
         self.legal_actions = [
-            "Elicit_Questioning",  # 启发式提问 (不给答案，反问引导)
-            "Provide_Hint",        # 提供线索 (指出方向，但不写代码)
-            "Explain_Concept",     # 概念解释 (补充缺失的背景知识)
-            "Direct_Correction"    # 直接纠正 (仅在极端死循环时使用)
+            "Elicit_Questioning",  # 启发式提问
+            "Provide_Hint",        # 提供线索
+            "Explain_Concept",     # 概念解释
+            "Role_Reversal",       # 【新增】角色互换 (ZPD自适应降维：让学生当老师诊断伪代码)
+            "Direct_Correction"    # 直接纠正 (红线动作)
         ]
+        
+        # 【修复 5核心】初始化潜空间虚拟推演代理
+        # 在真实部署中，强烈建议此处指向 vLLM 部署的 Llama-3-8B 等轻量极速模型，以榨干 APC 缓存性能
+        self.virtual_llm = ChatOpenAI(
+            model_name="llama-3-8b-instruct", 
+            temperature=0.7,
+            api_key="EMPTY", 
+            base_url="http://192.168.123.8:8001/v1"  # 指向你的本地 vLLM 或其他服务商地址
+        )
 
     def _clean_deep_copy(self, state: GraphState) -> GraphState:
-        """
-        【关键修复 2】极其严格的深度清洗拷贝 (Deep Clean Copy)
-        专门反序列化并重建 LangChain 的各种 Message 对象与 Pydantic 状态。
-        兼容 Pydantic V2 API，彻底防止平行宇宙间的物理内存重叠。
-        """
+        """极其严格的深度清洗拷贝，防止平行推演时状态污染"""
         new_state = {}
         for k, v in state.items():
             if k == "messages":
                 new_msgs = []
                 for msg in v:
-                    # 安全提取 additional_kwargs
                     msg_kwargs = copy.deepcopy(msg.additional_kwargs) if hasattr(msg, "additional_kwargs") else {}
-                    
                     if isinstance(msg, HumanMessage):
                         new_msgs.append(HumanMessage(content=msg.content, additional_kwargs=msg_kwargs))
                     elif isinstance(msg, AIMessage):
                         new_msgs.append(AIMessage(content=msg.content, additional_kwargs=msg_kwargs))
                     elif isinstance(msg, SystemMessage):
                         new_msgs.append(SystemMessage(content=msg.content, additional_kwargs=msg_kwargs))
-                    elif isinstance(msg, ToolMessage):
-                        # ToolMessage 必须保留 tool_call_id
-                        t_id = getattr(msg, 'tool_call_id', '')
-                        new_msgs.append(ToolMessage(content=msg.content, tool_call_id=t_id, additional_kwargs=msg_kwargs))
                     else:
-                        # 终极兜底方案：兼容 Pydantic V2 与 V1
                         try:
-                            if hasattr(msg, "model_dump"):
-                                # Pydantic V2 规范 API
-                                new_msgs.append(msg.__class__(**msg.model_dump()))
-                            else:
-                                # Pydantic V1 遗留 API
-                                new_msgs.append(msg.__class__(**msg.dict()))
-                        except Exception:
-                            # 极端情况下的安全降级
+                            new_msgs.append(msg.__class__(**msg.model_dump()))
+                        except:
                             new_msgs.append(copy.deepcopy(msg))
                 new_state[k] = new_msgs
             elif k == "student_kcs" and isinstance(v, dict):
-                # 【核心修复】专门针对 Pydantic 知识节点对象的安全拷贝
                 new_kcs = {}
                 for kc_id, kc_state in v.items():
                     if hasattr(kc_state, "model_copy"):
-                        # Pydantic V2 的安全原生深拷贝方法
                         new_kcs[kc_id] = kc_state.model_copy(deep=True)
                     else:
                         new_kcs[kc_id] = copy.deepcopy(kc_state)
                 new_state[k] = new_kcs
             elif isinstance(v, (dict, list)):
-                # 针对普通标量嵌套对象
                 new_state[k] = copy.deepcopy(v)
             else:
-                # 针对标量 (turn_count, global_kl_shift 等)
                 new_state[k] = v
                 
-        # 标记为模拟状态
         new_state["is_simulation"] = True
         return new_state
 
-    def _simulate_action_effect(self, state: GraphState, action: str) -> None:
-        """
-        【关键修复 3】稳定期望的启发式代理状态转移 (Stable Heuristic Proxy State Transition)
-        使用 "稳定基线 + 微小噪声" 替代 "纯高方差随机分布"，
-        防止在 num_simulations 较小时策略评估发生严重抖动 (Flapping)。
-        """
-        kl = state.get("global_kl_shift", 0.0)
-        bug = state.get("verifier_scores", {}).get("bug_resolved", 0.0)
-
-        # 辅助函数：基于核心期望值注入少量噪声
-        noise = lambda base, var: base + random.uniform(-var, var)
-
-        if action == "Elicit_Questioning":
-            # 启发提问：认知增益大，但短期内解 Bug 慢
-            kl += noise(0.10, 0.02)
-            bug += noise(0.02, 0.01)
-        elif action == "Provide_Hint":
-            # 给定线索：两者较为均衡
-            kl += noise(0.05, 0.01)
-            bug += noise(0.15, 0.02)
-        elif action == "Explain_Concept":
-            # 解释概念：认知增益极大，稳定推进
-            kl += noise(0.15, 0.02)
-            bug += noise(0.08, 0.01)
-        elif action == "Direct_Correction":
-            # 【红线策略】直接纠正：Bug光速修复，但认知增益为 0
-            kl += 0.0 
-            bug += noise(0.50, 0.05)
-            state["used_direct_correction"] = True
-
-        # 回写状态，确保在合法的 0-1 概率空间内
-        state["global_kl_shift"] = min(1.0, max(0.0, kl))
-        if "verifier_scores" not in state:
-            state["verifier_scores"] = {}
-        state["verifier_scores"]["bug_resolved"] = min(1.0, max(0.0, bug))
-        state["turn_count"] = state.get("turn_count", 0) + 1
-
+    # ==========================================
+    # 异步并发搜索架构 (Root Parallelization)
+    # ==========================================
     def search(self, root_state: GraphState) -> Dict[str, Any]:
-        """执行 MCTS 搜索，返回最优策略 JSON"""
-        root = MCTSNode(state=self._clean_deep_copy(root_state))
+        """同步入口包装器，适配 LangGraph 的普通 Node 调用"""
+        logger.info("=== Consultant 启动 MCTS 潜空间并发推演 ===")
+        # 兼容当前线程是否已存在事件循环
+        try:
+            loop = asyncio.get_running_loop()
+            import nest_asyncio
+            nest_asyncio.apply()
+            return loop.run_until_complete(self._async_parallel_search(root_state))
+        except RuntimeError:
+            return asyncio.run(self._async_parallel_search(root_state))
 
-        for _ in range(self.num_simulations):
-            node = self._tree_policy(root)
-            reward = self._default_policy(node.state)
-            self._backpropagate(node, reward)
-
-        if not root.children:
-            best_action = "Elicit_Questioning" # 兜底策略
-        else:
-            best_child = max(root.children.values(), key=lambda c: c.visits)
-            best_action = best_child.action
-
+    async def _async_parallel_search(self, root_state: GraphState) -> Dict[str, Any]:
+        """执行根节点并发 MCTS，利用 asyncio.gather 激活 vLLM APC"""
+        # 并发启动多棵 MCTS 树
+        tasks = [self._run_single_tree(root_state) for _ in range(self.num_trees)]
+        roots = await asyncio.gather(*tasks)
+        
+        # 聚合所有根节点的访问次数 (合并平行宇宙的经验)
+        action_visits = {action: 0 for action in self.legal_actions}
+        action_values = {action: 0.0 for action in self.legal_actions}
+        
+        for r in roots:
+            for action, child in r.children.items():
+                action_visits[action] += child.visits
+                action_values[action] += child.value
+                
+        # 选出被探索次数最多的策略作为综合最优解
+        best_action = max(self.legal_actions, key=lambda a: action_visits[a])
+        total_visits = action_visits[best_action]
+        avg_value = (action_values[best_action] / total_visits) if total_visits > 0 else 0.5
+        
         strategy_payload = {
             "strategy_type": best_action,
-            "confidence_score": (best_child.value / best_child.visits) if best_child.visits > 0 else 0.5,
-            "reasoning": f"MCTS 潜空间推演完毕，评估 {best_action} 策略在平衡 KL 增益与 Bug 解决率上具有全局最优的长期价值。"
+            "confidence_score": round(avg_value, 4),
+            "internal_reasoning": f"MCTS在潜空间完成 {self.num_trees} 组并发推演，激活APC前缀缓存提速。评估表明 {best_action} 策略在当前状态下具有最大期望教育收益 (Value: {avg_value:.2f})。"
         }
         
-        logger.info(f"MCTS 规划完成，选定策略: {best_action}")
+        logger.info(f"MCTS 并发推演完成，选定最优战术: {best_action}")
         return strategy_payload
 
+    async def _run_single_tree(self, root_state: GraphState) -> MCTSNode:
+        """单棵 MCTS 树的推演循环"""
+        root = MCTSNode(state=self._clean_deep_copy(root_state))
+        for _ in range(self.simulations_per_tree):
+            node = self._tree_policy(root)
+            reward = await self._async_rollout_evaluate(node.state, node.action)
+            self._backpropagate(node, reward)
+        return root
+
     def _tree_policy(self, node: MCTSNode) -> MCTSNode:
-        """选择与扩展 (Selection & Expansion)"""
+        """选择与扩展 (由于不涉及 LLM，保持同步即可)"""
         current_depth = 0
         while current_depth < self.max_depth:
             if not node.is_fully_expanded(self.legal_actions):
                 return self._expand(node)
-            # 传入动态配置的探索常量 C
             node = node.best_child(self.exploration_weight)
             current_depth += 1
         return node
@@ -203,26 +187,57 @@ class MCTSPlanner:
         action = random.choice(untried_actions)
         
         next_state = self._clean_deep_copy(node.state)
-        self._simulate_action_effect(next_state, action)
+        # 为深层节点塞入伪动作标记，以便连续推演
+        next_state["turn_count"] = next_state.get("turn_count", 0) + 1
         
         child_node = MCTSNode(state=next_state, parent=node, action=action)
         node.children[action] = child_node
         return child_node
 
-    def _default_policy(self, state: GraphState) -> float:
-        """快速模拟 (Simulation/Rollout): 评估当前虚拟图状态的综合 Reward"""
-        kl_shift = state.get("global_kl_shift", 0.0)
-        bug_resolved = state.get("verifier_scores", {}).get("bug_resolved", 0.0)
-        turn_count = state.get("turn_count", 0)
+    async def _async_rollout_evaluate(self, state: GraphState, action: str) -> float:
+        """
+        【修复 5 核心：虚拟代理 Rollout】
+        摒弃拍脑袋的数学算子，真实调用 LLM 进行一轮虚拟推演。
+        所有的并发任务在此处共享相同的 state["messages"] 前缀，完美命中 vLLM APC 缓存！
+        """
+        if not action:
+            return 0.5
+            
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "你是一个MCTS潜空间推演引擎。根据下方的师生对话历史，如果老师接下来采用【{action}】策略，"
+                       "请推测学生的回应，并评估该策略带来的教育价值（综合考量Bug修复概率与认知增益）。\n"
+                       "要求：在你的回复的最后一行，必须严格且唯一地输出一个 0.0 到 1.0 的浮点数作为最终 Reward。"),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("user", "【系统推演指令】\n拟采取策略: {action}\n开始你的推演，并给出最后的浮点数评分。")
+        ])
         
-        # 启发式 Reward 函数设计: 鼓励启发认知、鼓励修复Bug、惩罚冗长推演
-        reward = (kl_shift * 0.4) + (bug_resolved * 0.5) - (turn_count * 0.05)
+        try:
+            # 真实并发生成，激活底层缓存
+            response = await self.virtual_llm.ainvoke({
+                "chat_history": state.get("messages", []),
+                "action": action
+            })
+            
+            # 正则暴力提取模型生成的最后一个浮点数作为 Reward
+            match = re.search(r'(0\.\d+|1\.0|0\.0)', response.content.split('\n')[-1])
+            if match:
+                reward = float(match.group(1))
+            else:
+                match_all = re.findall(r'(0\.\d+|1\.0|0\.0)', response.content)
+                reward = float(match_all[-1]) if match_all else 0.5
+                
+        except Exception as e:
+            logger.debug(f"虚拟代理评估异常，返回中性值: {e}")
+            reward = 0.5
 
-        # 【新增逻辑】对直接给答案的路径进行毁灭性打击
-        # 扣除 0.6 分，使得走这条路的 MCTS 分支价值立刻低于 Elicit_Questioning
-        if state.get("used_direct_correction", False):
+        # 【学术红线逻辑】对直接给答案的路径进行毁灭性打击
+        if action == "Direct_Correction":
             reward -= 0.6
-        
+            
+        # 角色互换通常具有极高的突破性教育价值，给予启发奖励
+        if action == "Role_Reversal":
+            reward += 0.1
+
         return max(0.0, min(1.0, reward))
 
     def _backpropagate(self, node: MCTSNode, reward: float):
@@ -231,19 +246,3 @@ class MCTSPlanner:
             node.visits += 1
             node.value += reward
             node = node.parent
-
-# ==========================================
-# 接入 LangGraph 的 Node 执行函数
-# ==========================================
-def consultant_mcts_step(state: GraphState) -> Dict[str, Any]:
-    """
-    LangGraph 的核心顾问节点：调用 MCTS Planner 生成后台指导策略。
-    """
-    logger.info("=== Consultant 启动 MCTS 后台推演 ===")
-    
-    # 限制搜索规模，保证生产环境延迟可控
-    # 在未来的开发集消融实验中，可以通过读取环境变量或配置文件传入 exploration_weight
-    planner = MCTSPlanner(num_simulations=10, max_depth=3, exploration_weight=1.414)
-    optimal_strategy = planner.search(state)
-    
-    return {"current_strategy": optimal_strategy}

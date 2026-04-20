@@ -22,7 +22,7 @@ class StudentAgent:
             model_name="llama-3-8b-instruct", 
             temperature=0.4,
             api_key="EMPTY", 
-            base_url="http://127.0.0.1:8001/v1"  # 指向你的本地 vLLM 或其他服务商地址
+            base_url="http://192.168.123.8:8001/v1"  # 指向你的本地 vLLM 或其他服务商地址
         )
         
         # 定义四种核心测试画像 (对应论文中的不同实验分组)

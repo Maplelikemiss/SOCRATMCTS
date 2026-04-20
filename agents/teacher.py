@@ -23,7 +23,7 @@ class TeacherAgent:
             model_name="socrat-teacher-glm4", 
             temperature=0.4,
             api_key="EMPTY", 
-            base_url="http://127.0.0.1:8000/v1"  # 指向你的本地 vLLM 或其他服务商地址
+            base_url="http://192.168.123.8:8002/v1"  # 指向你的本地 vLLM 或其他服务商地址
         )
         
         # 强约束系统提示词，坚决防止越权提供答案
