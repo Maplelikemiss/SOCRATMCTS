@@ -1,8 +1,12 @@
 # [重构] 连续知识追踪模块：结合 Reducer 优化防污染逻辑与局部增量状态更新
 import math
 import logging
+import re
+import os
 from typing import Dict, Any, Tuple, List
 from langchain_core.messages import BaseMessage
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
 
 # 引用已设计的状态结构
 from state.graph_state import GraphState, BayesianKnowledgeState
@@ -65,24 +69,61 @@ class BayesianKnowledgeTracer:
 
 def _extract_llm_observation(messages: List[BaseMessage], kc_id: str) -> float:
     """
-    [内部辅助函数] LLMKT 独立特征提取：
-    实际工程中此处应调用轻量级模型 (如 Llama-3 8B) 获取学生对该 kc_id 掌握的 Soft Score。
+    [终极防弹版] 使用大模型提取观测得分，并通过正则暴力解析，彻底免疫小模型幻觉。
     """
     if not messages:
         return 0.5
     
-    last_message = messages[-1].content.lower()
+    # 找到最后一条学生的发言
+    last_student_msg = ""
+    for msg in reversed(messages):
+        if msg.type == "human" or msg.name == "student":
+            last_student_msg = msg.content
+            break
+            
+    if not last_student_msg:
+        return 0.5
+        
+    # 第一重防线：严格的温度和提示词限制
+    llm = ChatOpenAI(
+        model_name="llama-3-8b-instruct", # 此处可替换为 Qwen 等其他本地模型
+        temperature=0.0, # 必须是0，保证打分稳定性
+        api_key="EMPTY", 
+        base_url="http://127.0.0.1:8001/v1",
+        max_tokens=50 # 限制长度，防止模型长篇大论
+    )
     
-    # 启发式模拟：根据学生语言中的关键词映射概率
-    negative_words = ["不知道", "不懂", "报错", "don't know", "not sure", "error", "confused"]
-    positive_words = ["原来如此", "明白了", "修复", "i understand", "i see", "i think i know", "am i right", "fixed", "got it"]
+    # 直接要求输出浮点数，对小模型来说比 JSON schema 更稳定
+    prompt = ChatPromptTemplate.from_template(
+        "你是一个极其敏锐的认知状态分析引擎。阅读学生说的话：「{student_msg}」\n"
+        "判断他是否理解了知识点或找准了代码Bug：\n"
+        "- 困惑、求助、报错，给 0.1。\n"
+        "- 陈述事实、未展现独立理解，给 0.5。\n"
+        "- 表达顿悟、找准逻辑或说出修改思路，给 0.85 或 0.9。\n\n"
+        "【极其严格的规则】：不要有任何解释！不要说废话！你的回复只能包含一个浮点数，例如 0.1 或 0.85。"
+    )
     
-    if any(word in last_message for word in negative_words):
-        return 0.1
-    elif any(word in last_message for word in positive_words):
-        return 0.85
+    chain = prompt | llm
     
-    return 0.5  # 默认中性观测，表示当前对话未涉及该知识点或信息模糊
+    try:
+        # 触发生成
+        response = chain.invoke({"student_msg": last_student_msg})
+        raw_text = response.content
+        
+        # 第二重防线：正则暴力提取 (寻找 0.x 或 1.0)
+        match = re.search(r'(0\.\d+|1\.0|0\.0)', raw_text)
+        
+        if match:
+            score = float(match.group(1))
+            # 第三重防线：数值范围截断
+            return max(0.0, min(1.0, score))
+        else:
+            logger.warning(f"LLMKT 解析失败，未找到浮点数。原始文本: {raw_text}")
+            return 0.5
+            
+    except Exception as e:
+        logger.error(f"LLMKT API请求异常，启用降级兜底: {e}")
+        return 0.5  # 终极防线：无论发生什么，都返回中性值，绝不阻断系统运行
 
 # ==========================================
 # 接入 LangGraph 的 Node 执行函数
