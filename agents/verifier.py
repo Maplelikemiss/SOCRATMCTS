@@ -1,4 +1,4 @@
-# [重构] 改造原 verifier.py，严格对齐论文《实验方案设计.docx》中的 9 维双层评估体系
+# [修复] 纠正 Pydantic 必填字段缺失与大小写错位问题，确保评估闭环，并增加历史分发机制
 import logging
 from typing import Dict, Any
 from pydantic import BaseModel, Field
@@ -22,6 +22,7 @@ class NineDimEvaluation(BaseModel):
     """
     Socratic 教学质量双层评估体系打分结构
     注意：包含一个基础的 Bug 修复判定，外加严格对齐论文的 9 个学术指标。
+    字段名已全部规范为小写以匹配调用。
     """
     # 基础路由指标 (不计入 9 维核心得分，但控制图流转)
     bug_resolved: float = Field(
@@ -101,9 +102,26 @@ class VerifierAgent:
            - 采用李克特 5 分制，将其映射为浮点数：0.2(极差), 0.4(较差), 0.6(中等), 0.8(良好), 1.0(极佳)。
            - Repetitiveness（重复性）：注意这是逆向归一化指标！如果老师一直在死循环问同一个问题（如一直问“范围的上限对吗”），打低分（0.2或0.4）；如果视角开阔，不绕弯子，打高分（0.8或1.0）。
            - Flexibility（灵活性）：如果学生表示“听不懂”，老师能果断换个比喻，甚至让学生扮演老师（角色互换），必须给高分。
-           
-        请务必保持冷酷的客观性，不要使用 0.5 这种中庸底分。请以 JSON 格式输出评估结果。
+          
+        请务必保持冷酷的客观性，不要使用 0.5 这种中庸底分。
+        【严格要求】
+        请以 JSON 格式输出评估结果，键名请全部使用小写。
         """
+
+    def _get_default_scores(self) -> Dict[str, float]:
+        """生成带有具体数值的默认分数，防止 Pydantic 的缺失异常"""
+        return NineDimEvaluation(
+            bug_resolved=0.0, 
+            ndar=1.0, 
+            prr=1.0, 
+            spr=1.0, 
+            iar=1.0,
+            logicality=0.6, 
+            repetitiveness=0.6, 
+            guidance=0.6, 
+            flexibility=0.6, 
+            clarity=0.6
+        ).model_dump()
 
     def evaluate(self, state: GraphState) -> Dict[str, float]:
         """
@@ -112,11 +130,7 @@ class VerifierAgent:
         messages = state.get("messages", [])
         
         if not messages:
-            # 初始安全底分
-            return NineDimEvaluation(
-                bug_resolved=0.0, ndar=1.0, prr=1.0, spr=1.0, iar=1.0,
-                logicality=0.6, repetitiveness=0.6, guidance=0.6, flexibility=0.6, clarity=0.6
-            ).model_dump()
+            return self._get_default_scores()
             
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
@@ -131,10 +145,7 @@ class VerifierAgent:
             return eval_result.model_dump()
         except Exception as e:
             logger.error(f"Verifier 结构化打分失败，启用安全底分容错: {e}")
-            return NineDimEvaluation(
-                bug_resolved=0.0, ndar=1.0, prr=1.0, spr=1.0, iar=1.0,
-                logicality=0.6, repetitiveness=0.6, guidance=0.6, flexibility=0.6, clarity=0.6
-            ).model_dump()
+            return self._get_default_scores()
 
 # ==========================================
 # 接入 LangGraph 的 Node 执行函数
@@ -147,6 +158,8 @@ def verifier_evaluate_step(state: GraphState) -> Dict[str, Any]:
     
     logger.debug(f"当前 Bug 解决状态: {scores.get('bug_resolved', 0.0):.2f} | 核心红线(NDAR): {scores.get('ndar', 1.0):.2f}")
     
+    # 【核心修改】不仅返回本轮分数，还将其包装成列表通过 operator.add 追加到历史记录中
     return {
-        "verifier_scores": scores
+        "verifier_scores": scores,
+        "verifier_history": [scores]
     }

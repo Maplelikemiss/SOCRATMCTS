@@ -23,7 +23,7 @@ class ConsultantStrategyPayload(BaseModel):
     """
     strategy_type: str = Field(
         ..., 
-        description="MCTS选定的核心动作类型 (如: Elicit_Questioning, Provide_Hint, Explain_Concept, Direct_Correction)"
+        description="MCTS选定的核心动作类型 (如: Elicit_Questioning, Provide_Hint, Explain_Concept, Role_Reversal, Direct_Correction)"
     )
     focus_kc_id: str = Field(
         ..., 
@@ -44,14 +44,13 @@ class ConsultantAgent:
     职责：结合 MCTS 规划引擎的宏观决策与 LLM 的微观生成能力，制定苏格拉底教学策略。
     """
     def __init__(self, model_name: str = "gpt-4o-mini", temperature: float = 0.2):
-        # 初始化结构化输出的 LLM (要求环境配置好 OPENAI_API_KEY)
-        #self.llm = ChatOpenAI(model=model_name, temperature=temperature)
-        
+        '''
         self.llm = ChatOpenAI(
             model_name="llama-3.3", 
             temperature=0.4,
             api_key="vllm-local-service", 
-            #max_tokens=800,          # 【核心修复】加上这个！强制最多只准生成800个字
+            max_tokens=800,  # 【核心修复1】去掉注释，加装物理刹车，防止发疯生成 8000 个 token
+            model_kwargs={"response_format": {"type": "json_object"}}, # 【核心修复2】强制 vLLM 底层使用 JSON 模式
             base_url="http://192.168.123.8:8000/v1"  # 指向你的本地 vLLM 或其他服务商地址
         )
         '''
@@ -59,9 +58,9 @@ class ConsultantAgent:
             model_name="qwen3.5-plus", 
             temperature=0.4,
             api_key=os.getenv("DASHSCOPE_API_KEY"), 
-            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"  # 指向你的本地 vLLM 或其他服务商地址
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
         )
-        '''
+
         self.structured_llm = self.llm.with_structured_output(ConsultantStrategyPayload)
         
         # Consultant 的系统提示词：核心在于“幕后指挥”
@@ -112,7 +111,7 @@ class ConsultantAgent:
             ("user", "【系统环境指令】\n"
                      "MCTS 引擎已规划当前的最佳宏观动作为: {mcts_action}\n"
                      "系统检测到学生当前最薄弱的知识点/Bug为: {weakest_kc} (掌握概率: {prob:.2f})\n"
-                     "请基于上述信息，输出给 Teacher 的指导策略。")
+                     "请基于上述信息，输出给 Teacher 的指导策略。以严格的 JSON 格式输出。")
         ])
         
         chain = prompt | self.structured_llm
@@ -145,12 +144,11 @@ def consultant_node_step(state: GraphState) -> Dict[str, Any]:
     LangGraph 顾问节点：
     1. 调用 MCTSPlanner 获取宏观最优动作
     2. 调用 ConsultantAgent 生成详细 JSON 策略草案
-    注：替代了原来 mcts_planner.py 里的粗糙包装。
     """
     logger.info("=== Consultant 节点开始运作 ===")
     
     # 步骤 1: 蒙特卡洛树搜索 (纯算法推演)
-    planner = MCTSPlanner(num_simulations=6, max_depth=3)
+    planner = MCTSPlanner(num_trees=4, simulations_per_tree=3, max_depth=2)
     mcts_result = planner.search(state)
     best_action = mcts_result.get("strategy_type", "Elicit_Questioning")
     

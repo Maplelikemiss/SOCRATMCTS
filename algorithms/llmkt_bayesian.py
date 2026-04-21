@@ -144,12 +144,12 @@ def llmkt_bayesian_update_step(state: GraphState) -> Dict[str, Any]:
     # 冷启动处理：如果当前没有任何 KC，动态注入一个基础 KC
     if not student_kcs:
         default_kc_id = "target_bug_understanding"
-        # 初始化新的 Pydantic 状态对象
-        new_kc = BayesianKnowledgeState(kc_id=default_kc_id, prior_prob=0.5, posterior_prob=0.5)
+        # 【核心修改】将先验概率从 0.5 降到 0.2，实施悲观初始化 (Pessimistic Initialization)
+        new_kc = BayesianKnowledgeState(kc_id=default_kc_id, prior_prob=0.2, posterior_prob=0.2)
         partial_updated_kcs[default_kc_id] = new_kc
         # 为了让下方的循环在冷启动时也能执行评估，临时引用一下
         student_kcs = partial_updated_kcs 
-        logger.info(f"LLMKT: 初始化默认知识组件 {default_kc_id}")
+        logger.info(f"LLMKT: 初始化默认知识组件 {default_kc_id} (采用悲观初始值 0.2)")
 
     # 遍历更新学生的各项知识组件
     for kc_id, kc_state in student_kcs.items():

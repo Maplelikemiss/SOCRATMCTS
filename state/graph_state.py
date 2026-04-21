@@ -3,6 +3,7 @@ from typing import Annotated, TypedDict, List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from langchain_core.messages import BaseMessage
 import operator # 【新增导入】
+
 def add_messages(left: List[BaseMessage], right: List[BaseMessage]) -> List[BaseMessage]:
     """LangGraph 规约：状态中的 messages 必须是追加 (append) 而不是覆盖"""
     return left + right
@@ -29,8 +30,9 @@ def merge_kcs(left: Dict[str, 'BayesianKnowledgeState'], right: Dict[str, 'Bayes
 class BayesianKnowledgeState(BaseModel):
     """连续贝叶斯知识追踪 (LLMKT) 的微观状态"""
     kc_id: str = Field(..., description="知识组件(KC)或 Bug 类型的唯一标识")
-    prior_prob: float = Field(default=0.5, description="先验概率 P(L)")
-    posterior_prob: float = Field(default=0.5, description="贝叶斯后验概率 P(L|Obs)，范围 0~1")
+    # 【核心修改】彻底贯彻悲观初始化，将默认值从 0.5 降到 0.2
+    prior_prob: float = Field(default=0.2, description="先验概率 P(L)")
+    posterior_prob: float = Field(default=0.2, description="贝叶斯后验概率 P(L|Obs)，范围 0~1")
     kl_divergence: float = Field(default=0.0, description="本轮对话带来的认知状态转移 KL 散度")
 
 class GraphState(TypedDict):
@@ -41,14 +43,15 @@ class GraphState(TypedDict):
     # 2. 认知追踪与推演状态
     # 【关键修复】引入 merge_kcs 归约器，杜绝字典被整体覆写
     student_kcs: Annotated[Dict[str, BayesianKnowledgeState], merge_kcs]
-    global_kl_shift: float
     current_strategy: Optional[Dict[str, Any]]
     
     # 【修复这一行：增加 operator.add 累加器】
     global_kl_shift: Annotated[float, operator.add]
 
     # 3. 评估指标
-    verifier_scores: Dict[str, float]
+    verifier_scores: Dict[str, float] # 当前轮次的即时分数
+    # 【核心新增】记录每一轮分数的历史数组，使用 operator.add 自动追加
+    verifier_history: Annotated[List[Dict[str, float]], operator.add]
     
     # 4. 控制流与对抗配置
     is_simulation: bool

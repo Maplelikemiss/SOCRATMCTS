@@ -17,6 +17,7 @@ from evaluation.evaluation_metrics import (
     save_evaluation_results, 
     calculate_average_metrics
 )
+from state.graph_state import BayesianKnowledgeState
 
 # 配置全局日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -66,14 +67,44 @@ def run_evaluation_pipeline(
             # 初始化本轮对话的安全隔离状态
             initial_state = build_initial_graph_state(item, base_persona=persona, max_turns=6)
             
+            # 【终极拦截补丁】强制抹除 evaluation/utils.py 内部可能残留的 0.5 历史遗留！
+            initial_state["student_kcs"] = {
+                "target_bug_understanding": BayesianKnowledgeState(
+                    kc_id="target_bug_understanding",
+                    prior_prob=0.2,     # 强制上锁 0.2
+                    posterior_prob=0.2  # 强制上锁 0.2
+                )
+            }
+            
+            # 【核心注入】确保图状态中拥有空白的历史数组起步
+            initial_state["verifier_history"] = []
+            
             try:
-                # 【核心驱动】触发 LangGraph 状态机流转 (invoke 返回的是最终结束时的状态)
-                # 注入 recursion_limit=100 防止复杂图流转时触发默认递归限制截断
+                # 【核心驱动】触发 LangGraph 状态机流转
                 final_state = socrat_app.invoke(initial_state, config={"recursion_limit": 100})
                 
                 # 从最终状态中提取分析所需的数据
                 formatted_history = format_dialogue_history(final_state.get("messages", []))
-                final_scores = final_state.get("verifier_scores", {})
+                
+                # 【核心修改点】提取历史分数并进行智能聚合计算
+                history = final_state.get("verifier_history", [])
+                if not history:
+                    history = [final_state.get("verifier_scores", {})]
+                    
+                # 聚合规则：Bug态取Max, ndar取Min, 其他所有过程维度(prr/spr/iar/5维)全取Avg
+                final_scores = {
+                    "bug_resolved": max((h.get("bug_resolved", 0.0) for h in history), default=0.0),
+                    "ndar": min((h.get("ndar", 1.0) for h in history), default=1.0),
+                    "prr": round(sum(h.get("prr", 1.0) for h in history) / len(history), 2),
+                    "spr": round(sum(h.get("spr", 1.0) for h in history) / len(history), 2),
+                    "iar": round(sum(h.get("iar", 1.0) for h in history) / len(history), 2),
+                    "logicality": round(sum(h.get("logicality", 0.6) for h in history) / len(history), 2),
+                    "repetitiveness": round(sum(h.get("repetitiveness", 0.6) for h in history) / len(history), 2),
+                    "guidance": round(sum(h.get("guidance", 0.6) for h in history) / len(history), 2),
+                    "flexibility": round(sum(h.get("flexibility", 0.6) for h in history) / len(history), 2),
+                    "clarity": round(sum(h.get("clarity", 0.6) for h in history) / len(history), 2),
+                }
+                
                 global_kl = final_state.get("global_kl_shift", 0.0)
                 
                 # 组装单条落盘记录
@@ -90,7 +121,6 @@ def run_evaluation_pipeline(
                 
             except Exception as e:
                 logger.error(f"     ❌ 测评崩溃 (问题ID: {question_id}, 画像: {persona}) - 错误信息: {e}")
-                # 隔离错误，记录空结果以备核查，继续下一轮
                 all_results.append({
                     "question_id": question_id,
                     "persona": persona,
@@ -102,7 +132,6 @@ def run_evaluation_pipeline(
     logger.info("=" * 60)
     logger.info(f"🏁 评测流水线运行完毕！耗时: {(end_time - start_time):.2f} 秒")
     
-    # 计算全盘 9 维指标均值
     valid_results = [r for r in all_results if "error" not in r]
     avg_metrics = calculate_average_metrics(valid_results)
     
@@ -110,7 +139,6 @@ def run_evaluation_pipeline(
     for metric, val in avg_metrics.items():
         logger.info(f"    - {metric}: {val}")
         
-    # 5. 数据落盘
     save_evaluation_results(all_results, output_path)
 
 if __name__ == "__main__":
@@ -120,7 +148,6 @@ if __name__ == "__main__":
     parser.add_argument("--sample_size", type=int, default=1, help="限制测试样本量 (-1 表示全量测试)")
     args = parser.parse_args()
     
-    # 确保当前工作目录下有一个示例数据集，如果没有则给出友好提示
     if not os.path.exists(args.dataset):
         logger.warning(f"⚠️ 未找到数据集 {args.dataset}。请确保从您的原 KELE 仓库中将数据文件拷贝到此同级目录。")
         logger.warning("我将自动创建一个极其简单的 mock_dataset.json 以供系统预热测试...")
@@ -137,7 +164,6 @@ if __name__ == "__main__":
             import json
             json.dump(mock_data, f, ensure_ascii=False, indent=2)
         args.dataset = "mock_dataset.json"
-
     # 执行流水线
     run_evaluation_pipeline(
         dataset_path=args.dataset,
