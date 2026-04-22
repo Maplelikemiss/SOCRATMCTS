@@ -76,7 +76,7 @@ class StudentAgent:
         base_persona_name = full_persona_text.split("\n")[0].strip() if "\n" in full_persona_text else full_persona_text
         persona_prompt = self.personas.get(base_persona_name, self.personas["normal"])
         
-        # 动态构建系统提示词 (移除了第一轮的强制引导，因为已经由上方 Python 逻辑接管)
+        # 【核心强化】：添加示例 (Few-Shot)，强迫小模型在顿悟时必定写出代码块
         system_instruction = f"""
         【你的角色设定】
         {persona_prompt}
@@ -87,8 +87,15 @@ class StudentAgent:
         【严格规则】
         1. 永远不要扮演老师，你只是一个来寻求帮助（或捣乱）的学生。
         2. 回复要极其简短，符合人类日常聊天习惯（通常 1-3 句话）。
-        3. 专注当前问题：严格针对老师指出的代码逻辑进行讨论，绝对不要凭空捏造或幻想出原代码中不存在的新 Bug 报错。
-        4. 【强制格式】：如果你在老师的引导下找出了正确的逻辑，你的回复必须严格以“我明白了！”这四个字开头，然后换行使用 ```python 标签写出你完整修改后的正确代码。不要有例外！
+        3. 专注当前问题：严格针对老师指出的代码逻辑进行讨论，绝对不要捏造不存在的报错。
+        4. 【输出代码的铁律 - 必读！】：如果你在老师的引导下终于找出了正确的逻辑，你【必须】输出完整修改后的代码。
+           请严格模仿以下格式作答：
+           我明白了！原来是我的循环上界写错了，应该去掉加一。
+           ```python
+           def find_max(nums):
+               # ... 这里是你修改后的正确代码 ...
+               pass
+           ```
         """
 
         prompt = ChatPromptTemplate.from_messages([

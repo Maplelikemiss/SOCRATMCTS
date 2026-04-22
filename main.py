@@ -8,6 +8,7 @@ import argparse
 from typing import List, Dict, Any
 
 # 1. 导入 LangGraph 状态机编排应用
+# 注意：如果你的 langgraph_app.py 中函数名是 create_socrat_graph，请在此处修改或保持对齐
 from langgraph_app import build_socrat_mcts_graph
 
 # 2. 导入数据工具与指标计算模块
@@ -119,6 +120,10 @@ def run_evaluation_pipeline(
                 all_results.append(result_entry)
                 logger.info(f"     ✅ 测评成功 | Bug解决率: {final_scores.get('bug_resolved', 0):.2f} | 轮次: {final_state.get('turn_count', 0)}")
                 
+                # 【核心修复：实时断点落盘】每跑完一道题的某一个画像，立刻覆盖保存一次！
+                # 这样即使手动 Ctrl+C 或者断电，之前跑完的数据绝不会丢失。
+                save_evaluation_results(all_results, output_path)
+                
             except Exception as e:
                 logger.error(f"     ❌ 测评崩溃 (问题ID: {question_id}, 画像: {persona}) - 错误信息: {e}")
                 all_results.append({
@@ -126,6 +131,9 @@ def run_evaluation_pipeline(
                     "persona": persona,
                     "error": str(e)
                 })
+                
+                # 【核心修复：崩溃也落盘】把带 error 的残缺记录也存下来，方便排查
+                save_evaluation_results(all_results, output_path)
                 
     # 4. 统计与聚合输出
     end_time = time.time()
@@ -145,7 +153,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SocratMCTS 批量评估引擎")
     parser.add_argument("--dataset", type=str, default="SocratDataset.json", help="数据集 JSON 文件路径")
     parser.add_argument("--output", type=str, default="evaluation_results/final_report.json", help="结果输出路径")
-    parser.add_argument("--sample_size", type=int, default=1, help="限制测试样本量 (-1 表示全量测试)")
+    parser.add_argument("--sample_size", type=int, default=3, help="限制测试样本量 (-1 表示全量测试)")
     args = parser.parse_args()
     
     if not os.path.exists(args.dataset):
@@ -164,6 +172,7 @@ if __name__ == "__main__":
             import json
             json.dump(mock_data, f, ensure_ascii=False, indent=2)
         args.dataset = "mock_dataset.json"
+        
     # 执行流水线
     run_evaluation_pipeline(
         dataset_path=args.dataset,

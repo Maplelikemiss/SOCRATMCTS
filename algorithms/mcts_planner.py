@@ -1,4 +1,5 @@
 # [重构] MCTS 核心引擎：新增角色互换(Role-Reversal)，引入 Asyncio 并发与虚拟大模型推演以激活 vLLM APC
+# [修复] 引入动态动作屏蔽 (Dynamic Action Masking)，死守 NDAR 学术红线
 import math
 import copy
 import random
@@ -29,6 +30,7 @@ class MCTSNode:
         self.value = 0.0
 
     def is_fully_expanded(self, legal_actions: List[str]) -> bool:
+        """检查当前节点的子节点是否已经覆盖了所有合法动作"""
         return len(self.children) == len(legal_actions)
 
     def best_child(self, exploration_weight: float) -> 'MCTSNode':
@@ -57,29 +59,40 @@ class MCTSPlanner:
     【重构亮点】：支持 Root Parallelization (根节点并发) 和虚拟大模型代理推演
     """
     def __init__(self, num_trees: int = 4, simulations_per_tree: int = 3, max_depth: int = 2, exploration_weight: float = 1.414):
-        # 将原本的 num_simulations 拆分为 num_trees (并发数) 和 simulations_per_tree (每棵树深度搜索次数)
         self.num_trees = num_trees
         self.simulations_per_tree = simulations_per_tree
         self.max_depth = max_depth
         self.exploration_weight = exploration_weight
         
-        # 【修复 1】扩充合法的苏格拉底教学动作空间 (引入 Role_Reversal)
-        self.legal_actions = [
-            "Elicit_Questioning",  # 启发式提问
-            "Provide_Hint",        # 提供线索
-            "Explain_Concept",     # 概念解释
-            "Role_Reversal",       # 【新增】角色互换 (ZPD自适应降维：让学生当老师诊断伪代码)
-            "Direct_Correction"    # 直接纠正 (红线动作)
-        ]
-        
-        # 【修复 5核心】初始化潜空间虚拟推演代理
-        # 在真实部署中，强烈建议此处指向 vLLM 部署的 Llama-3-8B 等轻量极速模型，以榨干 APC 缓存性能
+        # 初始化潜空间虚拟推演代理
         self.virtual_llm = ChatOpenAI(
             model_name="llama-3-8b-instruct", 
             temperature=0.7,
             api_key="EMPTY", 
             base_url="http://192.168.123.8:8001/v1"  # 指向你的本地 vLLM 或其他服务商地址
         )
+
+    def get_legal_actions(self, state: GraphState) -> List[str]:
+        """
+        【修复核心】：动态计算动作空间 (Dynamic Action Masking)
+        根据当前的对话轮次，决定是否放出 'Direct_Correction' 这个剧毒动作。
+        """
+        current_turn = state.get("turn_count", 0)
+        # 提供默认值防止异常，通常 main.py 传入 max_turns 为 6 或 8
+        max_turns = state.get("max_turns", 6) 
+        
+        base_actions = [
+            "Elicit_Questioning",  # 启发式提问
+            "Provide_Hint",        # 提供线索
+            "Explain_Concept",     # 概念解释
+            "Role_Reversal"        # 角色互换 (ZPD自适应降维)
+        ]
+        
+        # 动作屏蔽逻辑：除非走到绝境 (离最大轮次只剩最后1~2轮)，否则直接答案选项根本不存在于搜索树中
+        if current_turn >= max_turns - 2:
+            base_actions.append("Direct_Correction")
+            
+        return base_actions
 
     def _clean_deep_copy(self, state: GraphState) -> GraphState:
         """极其严格的深度清洗拷贝，防止平行推演时状态污染"""
@@ -123,7 +136,6 @@ class MCTSPlanner:
     def search(self, root_state: GraphState) -> Dict[str, Any]:
         """同步入口包装器，适配 LangGraph 的普通 Node 调用"""
         logger.info("=== Consultant 启动 MCTS 潜空间并发推演 ===")
-        # 兼容当前线程是否已存在事件循环
         try:
             loop = asyncio.get_running_loop()
             import nest_asyncio
@@ -134,28 +146,32 @@ class MCTSPlanner:
 
     async def _async_parallel_search(self, root_state: GraphState) -> Dict[str, Any]:
         """执行根节点并发 MCTS，利用 asyncio.gather 激活 vLLM APC"""
+        # 获取当前根节点状态下合法的动作空间
+        root_legal_actions = self.get_legal_actions(root_state)
+        
         # 并发启动多棵 MCTS 树
         tasks = [self._run_single_tree(root_state) for _ in range(self.num_trees)]
         roots = await asyncio.gather(*tasks)
         
-        # 聚合所有根节点的访问次数 (合并平行宇宙的经验)
-        action_visits = {action: 0 for action in self.legal_actions}
-        action_values = {action: 0.0 for action in self.legal_actions}
+        # 聚合所有根节点的访问次数
+        action_visits = {action: 0 for action in root_legal_actions}
+        action_values = {action: 0.0 for action in root_legal_actions}
         
         for r in roots:
             for action, child in r.children.items():
-                action_visits[action] += child.visits
-                action_values[action] += child.value
+                if action in action_visits: # 安全校验，确保只统计根节点合法动作
+                    action_visits[action] += child.visits
+                    action_values[action] += child.value
                 
         # 选出被探索次数最多的策略作为综合最优解
-        best_action = max(self.legal_actions, key=lambda a: action_visits[a])
+        best_action = max(root_legal_actions, key=lambda a: action_visits[a])
         total_visits = action_visits[best_action]
         avg_value = (action_values[best_action] / total_visits) if total_visits > 0 else 0.5
         
         strategy_payload = {
             "strategy_type": best_action,
             "confidence_score": round(avg_value, 4),
-            "internal_reasoning": f"MCTS在潜空间完成 {self.num_trees} 组并发推演，激活APC前缀缓存提速。评估表明 {best_action} 策略在当前状态下具有最大期望教育收益 (Value: {avg_value:.2f})。"
+            "internal_reasoning": f"MCTS在潜空间完成 {self.num_trees} 组并发推演。评估表明 {best_action} 策略在当前状态下具有最大期望教育收益 (Value: {avg_value:.2f})。"
         }
         
         logger.info(f"MCTS 并发推演完成，选定最优战术: {best_action}")
@@ -171,10 +187,11 @@ class MCTSPlanner:
         return root
 
     def _tree_policy(self, node: MCTSNode) -> MCTSNode:
-        """选择与扩展 (由于不涉及 LLM，保持同步即可)"""
+        """选择与扩展"""
         current_depth = 0
         while current_depth < self.max_depth:
-            if not node.is_fully_expanded(self.legal_actions):
+            legal_actions = self.get_legal_actions(node.state)
+            if not node.is_fully_expanded(legal_actions):
                 return self._expand(node)
             node = node.best_child(self.exploration_weight)
             current_depth += 1
@@ -182,12 +199,18 @@ class MCTSPlanner:
 
     def _expand(self, node: MCTSNode) -> MCTSNode:
         """扩展未尝试过的动作分支"""
+        legal_actions = self.get_legal_actions(node.state)
         tried_actions = list(node.children.keys())
-        untried_actions = [a for a in self.legal_actions if a not in tried_actions]
+        untried_actions = [a for a in legal_actions if a not in tried_actions]
+        
+        if not untried_actions:
+            # 防御性回退：如果当前节点无动作可扩展，直接返回自身进行评估
+            return node
+            
         action = random.choice(untried_actions)
         
         next_state = self._clean_deep_copy(node.state)
-        # 为深层节点塞入伪动作标记，以便连续推演
+        # 为深层节点塞入伪动作标记，模拟回合流转，以此让底层的 get_legal_actions 动态生效
         next_state["turn_count"] = next_state.get("turn_count", 0) + 1
         
         child_node = MCTSNode(state=next_state, parent=node, action=action)
@@ -196,9 +219,7 @@ class MCTSPlanner:
 
     async def _async_rollout_evaluate(self, state: GraphState, action: str) -> float:
         """
-        【修复 5 核心：虚拟代理 Rollout】
-        摒弃拍脑袋的数学算子，真实调用 LLM 进行一轮虚拟推演。
-        所有的并发任务在此处共享相同的 state["messages"] 前缀，完美命中 vLLM APC 缓存！
+        虚拟代理 Rollout：调用 LLM 进行一轮虚拟推演。
         """
         if not action:
             return 0.5
@@ -230,11 +251,15 @@ class MCTSPlanner:
             logger.debug(f"虚拟代理评估异常，返回中性值: {e}")
             reward = 0.5
 
-        # 【学术红线逻辑】对直接给答案的路径进行毁灭性打击
+        # ==========================================
+        # 奖励后处理 (Reward Shaping)
+        # ==========================================
+        # 1. 毁灭性打击：直接给答案 (绝对守护 NDAR 红线)
         if action == "Direct_Correction":
-            reward -= 0.6
+            # 即使 LLM 觉得很好，强制置为极低分甚至负分，确保其只作为绝对的保底被选中
+            reward = min(reward * 0.1, 0.1) 
             
-        # 角色互换通常具有极高的突破性教育价值，给予启发奖励
+        # 2. 启发性奖励：角色互换通常具有极高的突破性教育价值
         if action == "Role_Reversal":
             reward += 0.1
 

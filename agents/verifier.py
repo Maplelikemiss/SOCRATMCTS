@@ -1,4 +1,5 @@
 # [修复] 纠正 Pydantic 必填字段缺失与大小写错位问题，确保评估闭环，并增加历史分发机制
+# [强化] 增加 JSON 结构体强模板约束与 3 次重试机制 (Retry Loop)，防止评测分数被意外兜底污染
 import logging
 from typing import Dict, Any
 from pydantic import BaseModel, Field
@@ -104,8 +105,6 @@ class VerifierAgent:
            - Flexibility（灵活性）：如果学生表示“听不懂”，老师能果断换个比喻，甚至让学生扮演老师（角色互换），必须给高分。
           
         请务必保持冷酷的客观性，不要使用 0.5 这种中庸底分。
-        【严格要求】
-        请以 JSON 格式输出评估结果，键名请全部使用小写。
         """
 
     def _get_default_scores(self) -> Dict[str, float]:
@@ -126,6 +125,7 @@ class VerifierAgent:
     def evaluate(self, state: GraphState) -> Dict[str, float]:
         """
         根据当前对话历史计算金标准得分。
+        引入 3 次重试机制，防止 Pydantic 验证失败导致数据污染。
         """
         messages = state.get("messages", [])
         
@@ -135,17 +135,35 @@ class VerifierAgent:
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
-            ("user", "请根据上述最新对话状态，输出 9 维评估打分。务必保持冷酷客观！")
+            ("user", "请根据上述最新对话状态，输出完整的评估打分。务必保持冷酷客观！\n\n"
+                     "【格式极其严格要求】\n"
+                     "你必须且只能输出一个包含以下全部 10 个键的 JSON 对象（绝不能遗漏任何一个属性）：\n"
+                     "{{\n"
+                     '  "bug_resolved": <float>,\n'
+                     '  "ndar": <float>,\n'
+                     '  "prr": <float>,\n'
+                     '  "spr": <float>,\n'
+                     '  "iar": <float>,\n'
+                     '  "logicality": <float>,\n'
+                     '  "repetitiveness": <float>,\n'
+                     '  "guidance": <float>,\n'
+                     '  "flexibility": <float>,\n'
+                     '  "clarity": <float>\n'
+                     "}}")
         ])
         
         chain = prompt | self.structured_llm
         
-        try:
-            eval_result = chain.invoke({"chat_history": messages})
-            return eval_result.model_dump()
-        except Exception as e:
-            logger.error(f"Verifier 结构化打分失败，启用安全底分容错: {e}")
-            return self._get_default_scores()
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                eval_result = chain.invoke({"chat_history": messages})
+                return eval_result.model_dump()
+            except Exception as e:
+                logger.warning(f"⚠️ Verifier 结构化打分失败 (尝试 {attempt+1}/{max_retries}) - 原因: {e}")
+                
+        logger.error("❌ Verifier 连续 3 次打分失败，彻底崩溃！启用安全底分容错")
+        return self._get_default_scores()
 
 # ==========================================
 # 接入 LangGraph 的 Node 执行函数
@@ -158,7 +176,7 @@ def verifier_evaluate_step(state: GraphState) -> Dict[str, Any]:
     
     logger.debug(f"当前 Bug 解决状态: {scores.get('bug_resolved', 0.0):.2f} | 核心红线(NDAR): {scores.get('ndar', 1.0):.2f}")
     
-    # 【核心修改】不仅返回本轮分数，还将其包装成列表通过 operator.add 追加到历史记录中
+    # 将其包装成列表通过 operator.add 追加到历史记录中
     return {
         "verifier_scores": scores,
         "verifier_history": [scores]
