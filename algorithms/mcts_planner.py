@@ -239,13 +239,19 @@ class MCTSPlanner:
                 "action": action
             })
             
-            # 正则暴力提取模型生成的最后一个浮点数作为 Reward
-            match = re.search(r'(0\.\d+|1\.0|0\.0)', response.content.split('\n')[-1])
-            if match:
-                reward = float(match.group(1))
+            # 【新增：闲聊惩罚机制】
+            # 如果推演出学生在接下来的回复中没有包含实质性的代码词汇，说明当前策略无效
+            if len(re.findall(r'[a-zA-Z0-9_]{3,}', response.content)) < 2:
+                # 几乎没有技术词汇，判定为闲聊或无效回复
+                reward = 0.1
             else:
-                match_all = re.findall(r'(0\.\d+|1\.0|0\.0)', response.content)
-                reward = float(match_all[-1]) if match_all else 0.5
+                # 正常提取浮点数 Reward (保留了原有的双重正则容错机制)
+                match = re.search(r'(0\.\d+|1\.0|0\.0)', response.content.split('\n')[-1])
+                if match:
+                    reward = float(match.group(1))
+                else:
+                    match_all = re.findall(r'(0\.\d+|1\.0|0\.0)', response.content)
+                    reward = float(match_all[-1]) if match_all else 0.5
                 
         except Exception as e:
             logger.debug(f"虚拟代理评估异常，返回中性值: {e}")

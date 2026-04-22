@@ -44,14 +44,14 @@ class ConsultantAgent:
     职责：结合 MCTS 规划引擎的宏观决策与 LLM 的微观生成能力，制定苏格拉底教学策略。
     """
     def __init__(self, model_name: str = "gpt-4o-mini", temperature: float = 0.2):
-        '''
+        
         self.llm = ChatOpenAI(
-            model_name="llama-3.3", 
+            model_name="/home/xyc/qwen-72b-awq",  # 【关键修改】必须与你启动 vLLM 时的模型路径完全一致
             temperature=0.4,
-            api_key="vllm-local-service", 
-            max_tokens=800,  # 【核心修复1】去掉注释，加装物理刹车，防止发疯生成 8000 个 token
-            model_kwargs={"response_format": {"type": "json_object"}}, # 【核心修复2】强制 vLLM 底层使用 JSON 模式
-            base_url="http://192.168.123.8:8000/v1"  # 指向你的本地 vLLM 或其他服务商地址
+            api_key="EMPTY",                      # vLLM 本地服务默认不需要秘钥，填 "EMPTY" 或随便填都可以
+            max_tokens=800,                       # 保留你的物理刹车，这对于控制输出长度非常有用
+            model_kwargs={"response_format": {"type": "json_object"}}, # 强制 JSON 输出，非常适合智能体通信
+            base_url="http://192.168.123.2:8000/v1"   # 【关键修改】请根据代码运行的位置决定 IP
         )
         '''
         self.llm = ChatOpenAI(
@@ -60,7 +60,7 @@ class ConsultantAgent:
             api_key=os.getenv("DASHSCOPE_API_KEY"), 
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
         )
-
+        '''
         self.structured_llm = self.llm.with_structured_output(ConsultantStrategyPayload)
         
         # Consultant 的系统提示词：核心在于“幕后指挥”

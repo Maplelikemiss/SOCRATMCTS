@@ -92,18 +92,23 @@ def run_evaluation_pipeline(
                 if not history:
                     history = [final_state.get("verifier_scores", {})]
                     
-                # 聚合规则：Bug态取Max, ndar取Min, 其他所有过程维度(prr/spr/iar/5维)全取Avg
+                # 聚合规则：
+                # Bug态取Max, ndar取Min(因为有豁免权，取Min也安全了)
+                # prr/spr/iar 单轮行为，取Avg
+                # 5个全局指标(logicality等) 取【历史最后一次】的客观定调分！
+                last_score = history[-1]
                 final_scores = {
                     "bug_resolved": max((h.get("bug_resolved", 0.0) for h in history), default=0.0),
                     "ndar": min((h.get("ndar", 1.0) for h in history), default=1.0),
                     "prr": round(sum(h.get("prr", 1.0) for h in history) / len(history), 2),
                     "spr": round(sum(h.get("spr", 1.0) for h in history) / len(history), 2),
                     "iar": round(sum(h.get("iar", 1.0) for h in history) / len(history), 2),
-                    "logicality": round(sum(h.get("logicality", 0.6) for h in history) / len(history), 2),
-                    "repetitiveness": round(sum(h.get("repetitiveness", 0.6) for h in history) / len(history), 2),
-                    "guidance": round(sum(h.get("guidance", 0.6) for h in history) / len(history), 2),
-                    "flexibility": round(sum(h.get("flexibility", 0.6) for h in history) / len(history), 2),
-                    "clarity": round(sum(h.get("clarity", 0.6) for h in history) / len(history), 2),
+                    # 下面 5 个全部改为直接读取最后一条记录的分数
+                    "logicality": last_score.get("logicality", 0.6),
+                    "repetitiveness": last_score.get("repetitiveness", 0.6),
+                    "guidance": last_score.get("guidance", 0.6),
+                    "flexibility": last_score.get("flexibility", 0.6),
+                    "clarity": last_score.get("clarity", 0.6),
                 }
                 
                 global_kl = final_state.get("global_kl_shift", 0.0)
@@ -178,6 +183,6 @@ if __name__ == "__main__":
         dataset_path=args.dataset,
         output_path=args.output,
         sample_size=args.sample_size,
-        #personas_to_test=["normal", "stubborn"] # 演示模式下仅跑两种典型画像
-        personas_to_test=["normal", "zero_base", "random_noise"]
+        personas_to_test=["zero_base"] # 演示模式
+        #personas_to_test=["normal", "zero_base", "random_noise"]
     )
