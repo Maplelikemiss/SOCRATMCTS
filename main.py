@@ -35,8 +35,8 @@ def run_evaluation_pipeline(
     遍历数据集中的代码问题，并为每种对抗性画像运行 SocratMCTS 状态机。
     """
     if personas_to_test is None:
-        # 默认运行论文中规划的 4 组对比画像
-        personas_to_test = ["normal", "zero_base", "stubborn", "random_noise"]
+        # 默认运行论文中规划的 3 组对比画像
+        personas_to_test = ["normal", "zero_base", "random_noise"]
         
     logger.info("=" * 60)
     logger.info("🚀 SocratMCTS 学术实验评估流水线正式启动 🚀")
@@ -179,5 +179,5 @@ if __name__ == "__main__":
         output_path=args.output,
         sample_size=args.sample_size,
         #personas_to_test=["normal", "stubborn"] # 演示模式下仅跑两种典型画像
-        personas_to_test=["normal"]
+        personas_to_test=["normal", "zero_base", "random_noise"]
     )
