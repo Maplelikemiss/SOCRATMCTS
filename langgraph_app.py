@@ -115,6 +115,11 @@ def should_continue_teaching(state: GraphState) -> str:
 
     logger.info(f"【图流转判定】轮次: {turn_count}/{max_turns} | Bug解决率: {bug_resolved:.2f} | 最低KC掌握度: {lowest_prob:.2f}")
 
+    # 终止条件 2：达到最大防死循环限制，强制终止
+    if turn_count >= max_turns:
+        logger.warning("⚠️ 满足终止条件：达到最大对话轮次限制，遗憾退出并强行终止会话。")
+        return END
+
     # 终止条件 1：双重校验通过 (代码跑通 + 认知达标)
     if bug_resolved >= 0.85 and kc_threshold_met:
         logger.info("🎉 双重达标：Bug 已被成功修复，且核心概念(KC)已内化，进入 SPR 总结反思环节。")
@@ -125,10 +130,6 @@ def should_continue_teaching(state: GraphState) -> str:
         logger.warning("⚠️ 侦测到非理解性修复 (Bug解决但KC未达标)。强行拦截，回流 Consultant 追问底层逻辑。")
         return "consultant_node"
     
-    # 终止条件 2：达到最大防死循环限制，强制终止
-    if turn_count >= max_turns:
-        logger.warning("⚠️ 满足终止条件：达到最大对话轮次限制，遗憾退出并强行终止会话。")
-        return END
         
     # 继续教学：交由 Consultant (大脑) 进行 MCTS 规划
     logger.info("-> 局势尚未明朗，进入 Consultant 节点进行 MCTS 策略规划...")
