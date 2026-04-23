@@ -1,0 +1,8 @@
+[
+    {
+        "question_id": "task_001",
+        "experiment_mode": "TreeInstruct_Baseline",
+        "persona": "normal",
+        "error": "MCTSPlanner.search() takes 2 positional arguments but 4 were given"
+    }
+]

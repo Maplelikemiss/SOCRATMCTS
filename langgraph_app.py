@@ -37,6 +37,37 @@ def turn_manager_step(state: GraphState) -> Dict[str, Any]:
     current_turns = state.get("turn_count", 0)
     return {"turn_count": current_turns + 1}
 
+def vanilla_agent_step(state: GraphState) -> Dict[str, Any]:
+    """
+    [修改] 朴素大模型基线节点
+    升级为使用 70B 大模型作为 Strong Baseline。
+    """
+    logger.info("=== Vanilla Agent 节点开始生成朴素回复 (基于 70B 强基线) ===")
+    
+    # 【修改点】：替换为与 Consultant 相同的 70B 大模型配置
+    llm = ChatOpenAI(
+            model_name="/home/xyc/qwen-72b-awq",  # 【关键修改】必须与你启动 vLLM 时的模型路径完全一致
+            temperature=0.4,
+            api_key="EMPTY",                      # vLLM 本地服务默认不需要秘钥，填 "EMPTY" 或随便填都可以
+            max_tokens=800,                       # 保留你的物理刹车，这对于控制输出长度非常有用
+            model_kwargs={"response_format": {"type": "json_object"}}, # 强制 JSON 输出，非常适合智能体通信
+            base_url="http://192.168.123.2:8000/v1"   # 【关键修改】请根据代码运行的位置决定 IP
+        )
+    
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "你是一位编程导师。请根据学生的回复，用自然语言提供启发。绝对不要直接给出完整的修复代码块。"),
+        MessagesPlaceholder(variable_name="chat_history")
+    ])
+    
+    try:
+        response = prompt | llm
+        content = response.invoke({"chat_history": state.get("messages", [])}).content
+    except Exception as e:
+        logger.error(f"Vanilla Agent (70B) 生成失败: {e}")
+        content = "我明白你的困惑。让我们再仔细看看这行代码，你觉得问题出在哪里？"
+        
+    return {"messages": [AIMessage(content=content)]}
+
 def summary_node_step(state: GraphState) -> Dict[str, Any]:
     """
     [重构] 概念收敛性总结节点
@@ -88,10 +119,21 @@ def summary_node_step(state: GraphState) -> Dict[str, Any]:
 # ==========================================
 # 核心条件路由 (Conditional Edges)
 # ==========================================
+def route_after_student(state: GraphState) -> str:
+    """
+    [新增] 根据实验模式分流：
+    如果是朴素基线，直接走向 Vanilla Agent；否则走向 LLMKT 开始苏格拉底框架。
+    """
+    mode = state.get("experiment_mode", "Socrat_Full")
+    if mode == "Vanilla_Prompting":
+        return "vanilla_agent_node"
+    return "llmkt_node"
+
 def should_continue_teaching(state: GraphState) -> str:
     """
     条件路由判断：结合 Bug 修复率与贝叶斯知识追踪后验概率的双重检验。
     """
+    mode = state.get("experiment_mode", "Socrat_Full")
     scores = state.get("verifier_scores", {})
     bug_resolved = scores.get("bug_resolved", 0.0)
     turn_count = state.get("turn_count", 0)
@@ -113,7 +155,11 @@ def should_continue_teaching(state: GraphState) -> str:
         # 冷启动时防误判
         lowest_prob = 0.5
 
-    logger.info(f"【图流转判定】轮次: {turn_count}/{max_turns} | Bug解决率: {bug_resolved:.2f} | 最低KC掌握度: {lowest_prob:.2f}")
+    # 【新增】如果是 Vanilla_Prompting 模式，因跳过了 LLMKT 节点，无 KC 状态，强制豁免阈值
+    if mode == "Vanilla_Prompting":
+        kc_threshold_met = True
+
+    logger.info(f"【图流转判定】模式: {mode} | 轮次: {turn_count}/{max_turns} | Bug解决率: {bug_resolved:.2f} | 最低KC掌握度: {lowest_prob:.2f}")
 
     # 终止条件 2：达到最大防死循环限制，强制终止
     if turn_count >= max_turns:
@@ -131,10 +177,13 @@ def should_continue_teaching(state: GraphState) -> str:
         logger.warning("⚠️ 侦测到非理解性修复 (Bug解决但KC未达标)。强行拦截，回流 Consultant 追问底层逻辑。")
         return "consultant_node"
     
-        
     # 继续教学：交由 Consultant (大脑) 进行 MCTS 规划
-    logger.info("-> 局势尚未明朗，进入 Consultant 节点进行 MCTS 策略规划...")
-    return "consultant_node"
+    if mode == "Vanilla_Prompting":
+        logger.info("-> Vanilla 模式：跳过 Consultant，直接进入下一轮...")
+        return "turn_manager"
+    else:
+        logger.info("-> 局势尚未明朗，进入 Consultant 节点进行策略规划...")
+        return "consultant_node"
 
 
 def build_socrat_mcts_graph():
@@ -153,14 +202,25 @@ def build_socrat_mcts_graph():
     workflow.add_node("teacher_node", teacher_node_step)
     workflow.add_node("turn_manager", turn_manager_step)
     workflow.add_node("summary_node", summary_node_step)
-
-    # 【修改点 2】：注册全局评价节点
     workflow.add_node("global_evaluator_node", global_evaluate_step)
+    workflow.add_node("vanilla_agent_node", vanilla_agent_step) # 【新增节点】
 
     # 2. 定义静态流转边 (Edges)
     workflow.set_entry_point("student_node")
-    workflow.add_edge("student_node", "llmkt_node")
+    
+    # 【修改点】移除直接相连，改为条件路由分流
+    # workflow.add_edge("student_node", "llmkt_node")
+    workflow.add_conditional_edges(
+        "student_node",
+        route_after_student,
+        {
+            "vanilla_agent_node": "vanilla_agent_node",
+            "llmkt_node": "llmkt_node"
+        }
+    )
+    
     workflow.add_edge("llmkt_node", "verifier_node")
+    workflow.add_edge("vanilla_agent_node", "verifier_node") # 【新增边】朴素节点生成的回复也必须接受红线巡检
     
     workflow.add_edge("consultant_node", "teacher_node")
     workflow.add_edge("teacher_node", "turn_manager")
@@ -175,9 +235,9 @@ def build_socrat_mcts_graph():
         should_continue_teaching,
         {
             "summary_node": "summary_node", 
-            # 【修改点 4】：将原来的 END: END 替换为流向全局评价节点
             "global_evaluator_node": "global_evaluator_node",
-            "consultant_node": "consultant_node"
+            "consultant_node": "consultant_node",
+            "turn_manager": "turn_manager"  # 【新增路由出口】专供 Vanilla 模式跳过 Consultant
         }
     )
 

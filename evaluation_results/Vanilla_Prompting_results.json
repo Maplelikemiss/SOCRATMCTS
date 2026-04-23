@@ -1,0 +1,20 @@
+[
+    {
+        "question_id": "task_001",
+        "experiment_mode": "Vanilla_Prompting",
+        "persona": "normal",
+        "error": "name 'self' is not defined"
+    },
+    {
+        "question_id": "task_001",
+        "experiment_mode": "Vanilla_Prompting",
+        "persona": "zero_base",
+        "error": "name 'self' is not defined"
+    },
+    {
+        "question_id": "task_001",
+        "experiment_mode": "Vanilla_Prompting",
+        "persona": "random_noise",
+        "error": "name 'self' is not defined"
+    }
+]

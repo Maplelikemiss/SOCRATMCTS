@@ -18,7 +18,7 @@ class BayesianKnowledgeTracer:
     连续贝叶斯知识追踪引擎 (LLMKT)
     采用软证据更新(Soft Evidence Update)结合 BKT 标准转移方程。
     """
-    def __init__(self, slip_prob: float = 0.1, guess_prob: float = 0.2, transition_prob: float = 0.15):
+    def __init__(self, slip_prob: float = 0.1, guess_prob: float = 0.2, transition_prob: float = 0.25):
         # P(S): 学生已掌握但因粗心失误的概率
         self.P_S = slip_prob
         # P(G): 学生未掌握但侥幸猜对/蒙对的概率
@@ -136,6 +136,7 @@ def llmkt_bayesian_update_step(state: GraphState) -> Dict[str, Any]:
     tracer = BayesianKnowledgeTracer()
     student_kcs = state.get("student_kcs", {})
     messages = state.get("messages", [])
+    mode = state.get("experiment_mode", "Socrat_Full") # 【新增】读取实验模式
     
     # 局部增量更新字典，避免全量拷贝造成的内存浪费
     partial_updated_kcs = {}
@@ -160,20 +161,37 @@ def llmkt_bayesian_update_step(state: GraphState) -> Dict[str, Any]:
         if abs(obs_score - 0.5) < 0.05:
             continue
             
-        new_posterior, kl_div = tracer.update_kc_state(prior, obs_score)
-        
-        # 【关键优化 2】KL 阈值截断：仅当认知发生了实质性转移时，才生成新的深拷贝对象
-        if kl_div > 1e-4:
-            new_kc_state = kc_state.model_copy(update={
-                "prior_prob": prior,
-                "posterior_prob": new_posterior,
-                "kl_divergence": kl_div
-            })
-            partial_updated_kcs[kc_id] = new_kc_state
-            total_kl_shift += kl_div
+        # 【新增实验模式控制分支】
+        if mode in ["TreeInstruct_Baseline", "Ablation_No_LLMKT"]:
+            # 降维处理：取消连续概率，使用非黑即白的二元状态突变
+            new_posterior = 1.0 if obs_score >= 0.85 else 0.0
+            
+            # 只有当状态发生 0->1 或 1->0 的突变时才记录更新
+            if abs(new_posterior - prior) > 0.5:
+                new_kc_state = kc_state.model_copy(update={
+                    "prior_prob": prior,
+                    "posterior_prob": new_posterior,
+                    "kl_divergence": 0.0
+                })
+                partial_updated_kcs[kc_id] = new_kc_state
+                total_kl_shift += 1.0  # 象征性地记录一次状态跳变
+                logger.debug(f"LLMKT [离散降维模式]: {kc_id} 状态突变为 {new_posterior}")
+        else:
+            # 原始完整版逻辑：连续贝叶斯追踪
+            new_posterior, kl_div = tracer.update_kc_state(prior, obs_score)
+            
+            # 【关键优化 2】KL 阈值截断：仅当认知发生了实质性转移时，才生成新的深拷贝对象
+            if kl_div > 1e-4:
+                new_kc_state = kc_state.model_copy(update={
+                    "prior_prob": prior,
+                    "posterior_prob": new_posterior,
+                    "kl_divergence": kl_div
+                })
+                partial_updated_kcs[kc_id] = new_kc_state
+                total_kl_shift += kl_div
         
     if total_kl_shift > 0:
-        logger.debug(f"LLMKT 局部状态更新完成, 整体认知增益(KL): {total_kl_shift:.4f}")
+        logger.debug(f"LLMKT 局部状态更新完成, 整体认知增益/跳变: {total_kl_shift:.4f}")
     
     # 返回 diff 字典：LangGraph 底层的 merge_kcs 会将 partial_updated_kcs 安全地合并回主树
     return {

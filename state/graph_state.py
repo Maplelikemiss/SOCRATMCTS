@@ -55,7 +55,8 @@ class GraphState(TypedDict):
     # 【本次新增解耦字段】专门用于在结束时存放多轮全局李克特评估得分
     global_evaluation_scores: Optional[Dict[str, float]]
 
-    # 4. 控制流与对抗配置
+    # 4. 控制流与实验配置
+    experiment_mode: str  # 【新增】实验模式控制开关
     is_simulation: bool
     student_persona: str
     turn_count: int

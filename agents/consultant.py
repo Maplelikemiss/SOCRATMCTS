@@ -145,26 +145,66 @@ class ConsultantAgent:
 # ==========================================
 # 接入 LangGraph 的 Node 执行函数
 # ==========================================
+# ==========================================
+# 接入 LangGraph 的 Node 执行函数
+# ==========================================
 def consultant_node_step(state: GraphState) -> Dict[str, Any]:
     """
-    LangGraph 顾问节点：
-    1. 调用 MCTSPlanner 获取宏观最优动作
-    2. 调用 ConsultantAgent 生成详细 JSON 策略草案
+    LangGraph 顾问节点：评估当前局势，并生成教学策略草案。
+    【核心优化】接入实验模式控制，支持关闭 MCTS 或限制搜索深度。
     """
-    logger.info("=== Consultant 节点开始运作 ===")
+    logger.info("=== Consultant (顾问大脑) 开始推演 ===")
     
-    # 步骤 1: 蒙特卡洛树搜索 (纯算法推演)
-    planner = MCTSPlanner(num_trees=4, simulations_per_tree=3, max_depth=2)
-    mcts_result = planner.search(state)
-    best_action = mcts_result.get("strategy_type", "Elicit_Questioning")
+    mode = state.get("experiment_mode", "Socrat_Full") 
     
-    # 步骤 2: 大模型策略细化 (业务逻辑具象化)
+    # 寻找当前最薄弱的知识点 (仅作日志记录与兜底使用)
+    student_kcs = state.get("student_kcs", {})
+    weakest_kc = "target_bug_understanding"
+    lowest_prob = 1.0
+    for kc_id, kc_state in student_kcs.items():
+        if kc_state.posterior_prob < lowest_prob:
+            lowest_prob = kc_state.posterior_prob
+            weakest_kc = kc_id
+            
+    logger.info(f"当前最薄弱知识点: {weakest_kc} (掌握度: {lowest_prob:.2f}) | 运行模式: {mode}")
+
+    # 实例化顾问代理 (负责后续自然语言草案生成)
     agent = ConsultantAgent()
+    
+    # 【核心分支控制】根据实验模式调整推演深度
+    if mode == "Ablation_No_MCTS":
+        logger.info("-> [消融模式] Ablation_No_MCTS: 关闭 MCTS 树搜索，退化为直接贪心提问")
+        # 直接跳过推演引擎，给定一个基础宏观动作
+        best_action = "Elicit_Questioning"
+        
+    elif mode == "TreeInstruct_Baseline":
+        logger.info("-> [基线模式] TreeInstruct_Baseline: 启用 MCTS 但限制最大深度为 0 (单步局部贪心)")
+        # 【修复点】正确传参，只传 state！
+        planner = MCTSPlanner(num_trees=4, simulations_per_tree=3, max_depth=0)
+        mcts_result = planner.search(state)
+        best_action = mcts_result.get("strategy_type", "Elicit_Questioning")
+        
+    else:
+        # Socrat_Full 或 Ablation_No_LLMKT (保持 MCTS 推演)
+        logger.info("-> 启用完整 MCTS 潜空间并行推演")
+        # 【修复点】正确传参，只传 state！
+        planner = MCTSPlanner(num_trees=4, simulations_per_tree=3, max_depth=2)
+        mcts_result = planner.search(state)
+        best_action = mcts_result.get("strategy_type", "Elicit_Questioning")
+
+    # 将敲定的宏观动作 (best_action) 交由 70B 大模型扩展为具体的 JSON 战术草案
     detailed_strategy = agent.generate_strategy(state, best_action)
+
+    # 【终极安全红线校验】无论哪种模式，策略生成失败或缺失字段时的保守 Fallback
+    if not detailed_strategy or "strategy_type" not in detailed_strategy:
+        logger.warning("⚠️ 策略推演返回异常或格式损坏，触发保守后备策略。")
+        detailed_strategy = {
+            "strategy_type": "Elicit_Questioning",
+            "focus_kc_id": weakest_kc,
+            "internal_reasoning": "Fallback strategy due to generation error.",
+            "tactical_draft": "【系统回退指令】：引导学生思考当前代码的逻辑漏洞，绝对不允许直接输出完整的修复代码。"
+        }
+        
+    logger.info(f"顾问推演完成，敲定动作: {detailed_strategy.get('strategy_type')}")
     
-    logger.debug(f"生成的详细策略: {detailed_strategy}")
-    
-    # 将包含详细 draft 的策略注入图中，等待 Teacher 读取
-    return {
-        "current_strategy": detailed_strategy
-    }
+    return {"current_strategy": detailed_strategy}

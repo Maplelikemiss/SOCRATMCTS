@@ -35,7 +35,8 @@ def load_socrat_dataset(filepath: str) -> List[Dict[str, Any]]:
 def build_initial_graph_state(
     dataset_item: Dict[str, Any], 
     base_persona: str = "normal", 
-    max_turns: int = 8
+    max_turns: int = 8,
+    experiment_mode: str = "Socrat_Full"  # 【新增】接收来自 main.py 的实验模式参数
 ) -> Dict[str, Any]:
     """
     将数据集中的单条记录，转换为 LangGraph 可以直接执行的 Initial State (初始状态字典)。
@@ -70,5 +71,6 @@ def build_initial_graph_state(
         "is_simulation": False,
         "student_persona": injected_persona, # 携带了题目和Bug代码的“作弊版”画像
         "turn_count": 0,
-        "max_turns": max_turns
+        "max_turns": max_turns,
+        "experiment_mode": experiment_mode  # 【新增】将实验模式注入到图状态的起点
     }
