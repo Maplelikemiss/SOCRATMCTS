@@ -195,6 +195,6 @@ if __name__ == "__main__":
         dataset_path=args.dataset,
         output_path=args.output,
         sample_size=args.sample_size,
-        personas_to_test=["normal"] # 演示模式
+        personas_to_test=["normal","zero_base", "random_noise"] # 演示模式
         #personas_to_test=["normal", "zero_base", "random_noise"]
     )

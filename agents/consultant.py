@@ -91,9 +91,9 @@ class ConsultantAgent:
         
         绝对禁止输出类似 {{"action_mode": "...", "reason": "..."}} 这样篡改键名的格式！
 
-        【新增严格约束】：
-        在编写 "tactical_draft" 时，【绝对不允许】包含任何具体的 Python 代码！
-        你的草案只能是自然语言的指导策略（例如：“请反问学生列表长度和最大索引之间的数学关系”）。
+        【代码输出约束（生死红线）】：
+        1. 常规情况下：在编写 "tactical_draft" 时，【绝对不允许】包含任何具体的 Python 代码！你的草案只能是自然语言的指导策略（例如：“请反问学生列表长度和最大索引之间的数学关系”）。
+        2. 唯一的例外（Direct_Correction）：只有当 MCTS 下发的 `strategy_type` 明确为 "Direct_Correction" 时，你【必须】在草案中直接写出正确的 Python 修复代码，以便 Teacher 准确下发给学生。除此动作外，出现任何代码块均视为严重违规。
         """
 
     def generate_strategy(self, state: GraphState, mcts_action: str) -> Dict[str, Any]:

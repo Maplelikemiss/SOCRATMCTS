@@ -85,7 +85,8 @@ class MCTSPlanner:
             "Elicit_Questioning",  # 启发式提问
             "Provide_Hint",        # 提供线索
             "Explain_Concept",     # 概念解释
-            "Role_Reversal"        # 角色互换 (ZPD自适应降维)
+            "Role_Reversal",        # 角色互换 (ZPD自适应降维)
+            "Testing"              # 【新增】检验理解 (专门对付代码正确但不解释的情况)
         ]
         
         # 动作屏蔽逻辑：除非走到绝境 (离最大轮次只剩最后1~2轮)，否则直接答案选项根本不存在于搜索树中
