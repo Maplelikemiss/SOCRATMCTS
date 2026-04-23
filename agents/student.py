@@ -105,6 +105,7 @@ class StudentAgent:
                 # ... 这里是你修改后的正确代码 ...
                 pass
             ```
+        5. 严禁只回复表情。
         """
 
         prompt = ChatPromptTemplate.from_messages([
