@@ -52,7 +52,9 @@ class GraphState(TypedDict):
     verifier_scores: Dict[str, float] # 当前轮次的即时分数
     # 【核心新增】记录每一轮分数的历史数组，使用 operator.add 自动追加
     verifier_history: Annotated[List[Dict[str, float]], operator.add]
-    
+    # 【本次新增解耦字段】专门用于在结束时存放多轮全局李克特评估得分
+    global_evaluation_scores: Optional[Dict[str, float]]
+
     # 4. 控制流与对抗配置
     is_simulation: bool
     student_persona: str

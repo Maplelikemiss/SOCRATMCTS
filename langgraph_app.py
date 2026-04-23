@@ -17,7 +17,7 @@ from state.graph_state import GraphState
 # 导入所有节点执行函数
 from agents.student import student_node_step
 from algorithms.llmkt_bayesian import llmkt_bayesian_update_step
-from agents.verifier import verifier_evaluate_step
+from agents.verifier import verifier_evaluate_step, global_evaluate_step
 from agents.teacher import teacher_node_step
 from agents.consultant import consultant_node_step
 
@@ -118,7 +118,8 @@ def should_continue_teaching(state: GraphState) -> str:
     # 终止条件 2：达到最大防死循环限制，强制终止
     if turn_count >= max_turns:
         logger.warning("⚠️ 满足终止条件：达到最大对话轮次限制，遗憾退出并强行终止会话。")
-        return END
+        # 【修改点 1】：拦截原来的 END，转交给全局评估节点
+        return "global_evaluator_node"
 
     # 终止条件 1：双重校验通过 (代码跑通 + 认知达标)
     if bug_resolved >= 0.85 and kc_threshold_met:
@@ -153,6 +154,9 @@ def build_socrat_mcts_graph():
     workflow.add_node("turn_manager", turn_manager_step)
     workflow.add_node("summary_node", summary_node_step)
 
+    # 【修改点 2】：注册全局评价节点
+    workflow.add_node("global_evaluator_node", global_evaluate_step)
+
     # 2. 定义静态流转边 (Edges)
     workflow.set_entry_point("student_node")
     workflow.add_edge("student_node", "llmkt_node")
@@ -161,7 +165,9 @@ def build_socrat_mcts_graph():
     workflow.add_edge("consultant_node", "teacher_node")
     workflow.add_edge("teacher_node", "turn_manager")
     workflow.add_edge("turn_manager", "student_node")
-    workflow.add_edge("summary_node", END)
+    # 【修改点 3】：改变 summary_node 的出口，并让 global_evaluator_node 成为唯一通向 END 的节点
+    workflow.add_edge("summary_node", "global_evaluator_node")
+    workflow.add_edge("global_evaluator_node", END)
 
     # 3. 注册条件路由 (Conditional Edges)
     workflow.add_conditional_edges(
@@ -169,7 +175,8 @@ def build_socrat_mcts_graph():
         should_continue_teaching,
         {
             "summary_node": "summary_node", 
-            END: END,
+            # 【修改点 4】：将原来的 END: END 替换为流向全局评价节点
+            "global_evaluator_node": "global_evaluator_node",
             "consultant_node": "consultant_node"
         }
     )

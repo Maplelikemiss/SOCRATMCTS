@@ -87,28 +87,40 @@ def run_evaluation_pipeline(
                 # 从最终状态中提取分析所需的数据
                 formatted_history = format_dialogue_history(final_state.get("messages", []))
                 
-                # 【核心修改点】提取历史分数并进行智能聚合计算
+                # 【提取历史单轮分数】
                 history = final_state.get("verifier_history", [])
                 if not history:
                     history = [final_state.get("verifier_scores", {})]
+                
+                # 【提取终局宏观定调分数】
+                global_scores = final_state.get("global_evaluation_scores", {})
+                if not global_scores:
+                    logger.warning(f"⚠️ 未找到全局评价分数 (问题ID: {question_id})，启用中立底分")
+                    global_scores = {
+                        "logicality": 0.6,
+                        "repetitiveness": 0.6,
+                        "guidance": 0.6,
+                        "flexibility": 0.6,
+                        "clarity": 0.6
+                    }
                     
                 # 聚合规则：
-                # Bug态取Max, ndar取Min(因为有豁免权，取Min也安全了)
+                # Bug态取Max, ndar取Min(红线豁免权)
                 # prr/spr/iar 单轮行为，取Avg
-                # 5个全局指标(logicality等) 取【历史最后一次】的客观定调分！
-                last_score = history[-1]
+                # 5个全局指标 直接读取 global_evaluator_node 生成的权威定调分！
                 final_scores = {
                     "bug_resolved": max((h.get("bug_resolved", 0.0) for h in history), default=0.0),
                     "ndar": min((h.get("ndar", 1.0) for h in history), default=1.0),
                     "prr": round(sum(h.get("prr", 1.0) for h in history) / len(history), 2),
                     "spr": round(sum(h.get("spr", 1.0) for h in history) / len(history), 2),
                     "iar": round(sum(h.get("iar", 1.0) for h in history) / len(history), 2),
-                    # 下面 5 个全部改为直接读取最后一条记录的分数
-                    "logicality": last_score.get("logicality", 0.6),
-                    "repetitiveness": last_score.get("repetitiveness", 0.6),
-                    "guidance": last_score.get("guidance", 0.6),
-                    "flexibility": last_score.get("flexibility", 0.6),
-                    "clarity": last_score.get("clarity", 0.6),
+                    
+                    # 彻底解耦：从全局评价结果中读取
+                    "logicality": global_scores.get("logicality", 0.6),
+                    "repetitiveness": global_scores.get("repetitiveness", 0.6),
+                    "guidance": global_scores.get("guidance", 0.6),
+                    "flexibility": global_scores.get("flexibility", 0.6),
+                    "clarity": global_scores.get("clarity", 0.6),
                 }
                 
                 global_kl = final_state.get("global_kl_shift", 0.0)
@@ -158,7 +170,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SocratMCTS 批量评估引擎")
     parser.add_argument("--dataset", type=str, default="SocratDataset.json", help="数据集 JSON 文件路径")
     parser.add_argument("--output", type=str, default="evaluation_results/final_report.json", help="结果输出路径")
-    parser.add_argument("--sample_size", type=int, default=3, help="限制测试样本量 (-1 表示全量测试)")
+    parser.add_argument("--sample_size", type=int, default=1, help="限制测试样本量 (-1 表示全量测试)")
     args = parser.parse_args()
     
     if not os.path.exists(args.dataset):
@@ -183,6 +195,6 @@ if __name__ == "__main__":
         dataset_path=args.dataset,
         output_path=args.output,
         sample_size=args.sample_size,
-        personas_to_test=["zero_base"] # 演示模式
+        personas_to_test=["normal"] # 演示模式
         #personas_to_test=["normal", "zero_base", "random_noise"]
     )
