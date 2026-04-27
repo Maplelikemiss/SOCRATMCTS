@@ -180,7 +180,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, default="SocratDataset.json", help="数据集 JSON 文件路径")
     # 【修改点】改为接收 output_dir，而不是具体的文件名
     parser.add_argument("--output_dir", type=str, default="evaluation_results", help="结果输出目录")
-    parser.add_argument("--sample_size", type=int, default=3, help="限制测试样本量 (-1 表示全量测试)")
+    parser.add_argument("--sample_size", type=int, default=10, help="限制测试样本量 (-1 表示全量测试)")
     
     # 【新增点】添加 mode 选项控制实验变量
     parser.add_argument(

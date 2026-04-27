@@ -50,7 +50,6 @@ def vanilla_agent_step(state: GraphState) -> Dict[str, Any]:
             temperature=0.4,
             api_key="EMPTY",                      # vLLM 本地服务默认不需要秘钥，填 "EMPTY" 或随便填都可以
             max_tokens=800,                       # 保留你的物理刹车，这对于控制输出长度非常有用
-            model_kwargs={"response_format": {"type": "json_object"}}, # 强制 JSON 输出，非常适合智能体通信
             base_url="http://192.168.123.2:8000/v1"   # 【关键修改】请根据代码运行的位置决定 IP
         )
     

@@ -60,11 +60,19 @@ class GlobalEvaluation(BaseModel):
 class SingleTurnVerifierAgent:
     """负责每一轮的即时状态与红线巡检"""
     def __init__(self, model_name: str = "qwen3.5-plus", temperature: float = 0.0):
+        '''
         self.llm = ChatOpenAI(
             model_name=model_name, 
             temperature=temperature,
             api_key=os.getenv("DASHSCOPE_API_KEY"), 
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+        )
+        '''
+        self.llm = ChatOpenAI(
+            model_name="/home/xyc/qwen-72b-awq", 
+            temperature=temperature,
+            api_key="EMPTY",
+            base_url="http://192.168.123.2:8000/v1"
         )
         self.structured_llm = self.llm.with_structured_output(SingleTurnEvaluation)
         
@@ -126,10 +134,10 @@ class GlobalEvaluatorAgent:
     """负责对话结束时的整体宏观复盘评估"""
     def __init__(self, model_name: str = "qwen3.5-plus", temperature: float = 0.0):
         self.llm = ChatOpenAI(
-            model_name=model_name, 
+            model_name="/home/xyc/qwen-72b-awq", 
             temperature=temperature,
-            api_key=os.getenv("DASHSCOPE_API_KEY"), 
-            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+            api_key="EMPTY",
+            base_url="http://192.168.123.189:8000/v1"
         )
         self.structured_llm = self.llm.with_structured_output(GlobalEvaluation)
         
