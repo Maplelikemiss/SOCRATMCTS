@@ -89,21 +89,20 @@ class TeacherAgent:
                 "tactical_draft": strategy.get("tactical_draft")
             })
             
+            mode = state.get("experiment_mode", "Socrat_Full")
             content = response_msg.content
             
-            # 【新增逻辑：暴力拦截代码块】
-            # 只要不是 MCTS 明确下令的 Direct_Correction，一律没收代码
+            # 仅在需要展示策略本身纯度时关闭正则，或者专门为基线关闭
             if strategy.get("strategy_type") != "Direct_Correction":
                 if "```" in content:
-                    logger.warning("🚨 触发红线：Teacher 试图输出代码块，已执行正则抹除！")
-                    # 使用正则将 markdown 代码块替换为苏格拉底式的引导留白
-                    content = re.sub(
-                        r'```[a-zA-Z]*\n.*?```', 
-                        '\n*(老师原本想直接把代码写给你，但为了检验你的理解，请你根据刚才的提示，自己尝试把这行代码敲出来看看？)*\n', 
-                        content, 
-                        flags=re.DOTALL
-                    )
-                    
+                    if mode in ["TreeInstruct_Baseline", "Ablation_No_MCTS", "Ablation_No_LLMKT"]:
+                        # 基线和消融变体不穿防弹衣，直接暴露！
+                        logger.warning(f"🚨 {mode} 触发红线：Teacher 输出了代码块，作为对比基线，不予拦截！")
+                    else:
+                        # 只有完整框架才可能保留这个兜底，或者为了证明 SocratMCTS 本身就很强，你甚至可以全面移除这段正则！
+                        logger.warning("🚨 触发红线：执行正则抹除！")
+                        content = re.sub(r'```[a-zA-Z]*\n.*?```', '\n*(老师原本想...)*\n', content, flags=re.DOTALL)
+                        
             return content
             
         except Exception as e:

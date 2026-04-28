@@ -16,3 +16,4 @@ env/
 
 #忽略整个文件夹及其里面的所有内容
 #evaluation_results/
+SocratDataset.json
