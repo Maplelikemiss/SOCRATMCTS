@@ -93,7 +93,23 @@ class MCTSPlanner:
         if current_turn >= max_turns - 2:
             base_actions.append("Direct_Correction")
             
-        return base_actions
+        # --- 将以下逻辑替换原有的 return base_actions ---
+        # 获取当前状态下所有还未掌握的 KCs
+        student_kcs = state.get("student_kcs", {})
+        
+        unmastered_kcs = [kc_id for kc_id, kc_state in student_kcs.items() if kc_state.posterior_prob < 0.89]
+        
+        # 如果都已经掌握，或者没有KC，提供一个默认目标
+        if not unmastered_kcs:
+            unmastered_kcs = ["general"]
+            
+        # 交叉组合：生成类似 "Provide_Hint|kc_syntax_eq" 的复合动作
+        composite_actions = []
+        for strategy in base_actions:
+            for kc_id in unmastered_kcs:
+                composite_actions.append(f"{strategy}|{kc_id}")
+                
+        return composite_actions
 
     def _clean_deep_copy(self, state: GraphState) -> GraphState:
         """极其严格的深度清洗拷贝，防止平行推演时状态污染"""
@@ -169,10 +185,17 @@ class MCTSPlanner:
         total_visits = action_visits[best_action]
         avg_value = (action_values[best_action] / total_visits) if total_visits > 0 else 0.5
         
+        # 【新增】：拆解 MCTS 选出的最优复合动作
+        best_strategy = best_action
+        focus_kc = None
+        if "|" in best_action:
+            best_strategy, focus_kc = best_action.split("|", 1)
+        
         strategy_payload = {
-            "strategy_type": best_action,
+            "strategy_type": best_strategy,
+            "target_kc": focus_kc,  # 显式传递给下游
             "confidence_score": round(avg_value, 4),
-            "internal_reasoning": f"MCTS在潜空间完成 {self.num_trees} 组并发推演。评估表明 {best_action} 策略在当前状态下具有最大期望教育收益 (Value: {avg_value:.2f})。"
+            "internal_reasoning": f"MCTS在潜空间完成 {self.num_trees} 组并发推演。评估表明针对 {focus_kc} 采用 {best_strategy} 策略具有最大期望教育收益 (Value: {avg_value:.2f})。"
         }
         
         logger.info(f"MCTS 并发推演完成，选定最优战术: {best_action}")
@@ -213,7 +236,11 @@ class MCTSPlanner:
         next_state = self._clean_deep_copy(node.state)
         # 为深层节点塞入伪动作标记，模拟回合流转，以此让底层的 get_legal_actions 动态生效
         next_state["turn_count"] = next_state.get("turn_count", 0) + 1
-        
+        # 【新增】：解析复合动作，将焦点写入下一个状态
+        if "|" in action:
+            _, target_kc = action.split("|", 1)
+            if target_kc != "general":
+                next_state["current_focus_kc"] = target_kc
         child_node = MCTSNode(state=next_state, parent=node, action=action)
         node.children[action] = child_node
         return child_node
@@ -261,14 +288,31 @@ class MCTSPlanner:
         # ==========================================
         # 奖励后处理 (Reward Shaping)
         # ==========================================
+        strategy = action
+        target_kc_id = None
+        if "|" in action:
+            strategy, target_kc_id = action.split("|", 1)
+
         # 1. 毁灭性打击：直接给答案 (绝对守护 NDAR 红线)
-        if action == "Direct_Correction":
-            # 即使 LLM 觉得很好，强制置为极低分甚至负分，确保其只作为绝对的保底被选中
+        if strategy == "Direct_Correction":
             reward = min(reward * 0.1, 0.1) 
             
         # 2. 启发性奖励：角色互换通常具有极高的突破性教育价值
-        if action == "Role_Reversal":
+        if strategy == "Role_Reversal":
             reward += 0.1
+
+        # 3. 【新增】：前置依赖惩罚机制 (Prerequisite Penalty)
+        if target_kc_id and target_kc_id != "general":
+            student_kcs = state.get("student_kcs", {})
+            target_kc_state = student_kcs.get(target_kc_id)
+            # 检查是否有前置依赖
+            if target_kc_state and hasattr(target_kc_state, 'prerequisites'):
+                for pre_kc_id in target_kc_state.prerequisites:
+                    pre_kc_state = student_kcs.get(pre_kc_id)
+                    # 如果前置知识的后验概率低于 0.89，施加严重惩罚
+                    if pre_kc_state and pre_kc_state.posterior_prob < 0.89:
+                        reward -= 10.0  
+                        logger.warning(f"🚫 [MCTS 剪枝] 拒绝越级教学！试图教 {target_kc_id}，但前置基础 {pre_kc_id} (掌握度仅 {pre_kc_state.posterior_prob:.2f}) 未达标！")
 
         return max(0.0, min(1.0, reward))
 

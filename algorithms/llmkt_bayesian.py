@@ -67,7 +67,7 @@ class BayesianKnowledgeTracer:
         
         return posterior_prob, kl_div
 
-def _extract_llm_observation(messages: List[BaseMessage], kc_id: str) -> float:
+def _extract_llm_observation(messages: List[BaseMessage], kc_id: str, kc_desc: str) -> float:
     """
     [终极防弹版] 使用大模型提取观测得分，并通过正则暴力解析，彻底免疫小模型幻觉。
     """
@@ -94,20 +94,22 @@ def _extract_llm_observation(messages: List[BaseMessage], kc_id: str) -> float:
     )
     
     # 直接要求输出浮点数，对小模型来说比 JSON schema 更稳定
+    # 【核心修复】：注入具体的考点描述，让裁判具有多维分辨能力
     prompt = ChatPromptTemplate.from_template(
-        "你是一个极其冷酷、严格的认知状态分析引擎。阅读学生说的话：「{student_msg}」\n"
-        "你的唯一任务是判断这段话中是否包含了【实质性的技术理解】或【具体的代码逻辑】：\n"
-        "- 困惑、求助、说出错误的逻辑，给 0.1。\n"
-        "- 【核心防线】：如果学生仅仅是在闲聊、道谢、表决心（如“谢谢”、“我明白了”、“我会努力的”、“代码修正好了”），或者没有给出任何具体的底层技术细节，必须极其严格地给 0.5（代表认知状态不变）！\n"
-        "- 只有当学生具体解释了修改原理、推演了底层逻辑或输出了正确的修复代码时，才能给 0.85 或 0.9。\n\n"
+        "你是一个极其冷酷、严格的认知状态分析引擎。当前正在评估的特定知识点/Bug是：【{kc_desc}】。\n"
+        "阅读学生说的话：「{student_msg}」\n"
+        "你的唯一任务是判断这段话中，是否体现了学生对【上述特定知识点】的实质性理解或逻辑推演：\n"
+        "- 如果学生对该知识点依然困惑、求助，或说出了错误的逻辑，给 0.1。\n"
+        "- 【核心防线】：如果学生是在讨论其他不相关的代码、闲聊、道谢（如“谢谢”、“我明白了”），或者没有给出针对【该特定知识点】的底层技术细节，必须极其严格地给 0.5（代表认知状态不变）！\n"
+        "- 只有当学生具体解释了【该知识点】的修改原理、或者写出了对应的修复代码时，才能给 0.85 或 0.9。\n\n"
         "【极其严格的规则】：不要有任何解释！你的回复只能包含一个浮点数，例如 0.1, 0.5 或 0.85。"
     )
     
     chain = prompt | llm
     
     try:
-        # 触发生成
-        response = chain.invoke({"student_msg": last_student_msg})
+        # 【新增注入 kc_desc 变量】
+        response = chain.invoke({"student_msg": last_student_msg, "kc_desc": kc_desc})
         raw_text = response.content
         
         # 第二重防线：正则暴力提取 (寻找 0.x 或 1.0)
@@ -155,7 +157,9 @@ def llmkt_bayesian_update_step(state: GraphState) -> Dict[str, Any]:
     # 遍历更新学生的各项知识组件
     for kc_id, kc_state in student_kcs.items():
         prior = kc_state.posterior_prob 
-        obs_score = _extract_llm_observation(messages, kc_id)
+        # 【新增】：提取具体的知识点描述并传递给大模型裁判
+        kc_desc = getattr(kc_state, "description", kc_id)
+        obs_score = _extract_llm_observation(messages, kc_id, kc_desc)
         
         # 【关键优化 1】过滤噪声：如果观测得分在中立区 (0.5) 徘徊，视为无效观测，跳过计算
         if abs(obs_score - 0.5) < 0.05:
@@ -164,18 +168,22 @@ def llmkt_bayesian_update_step(state: GraphState) -> Dict[str, Any]:
         # 【新增实验模式控制分支】
         if mode in ["TreeInstruct_Baseline", "Ablation_No_LLMKT"]:
             # 降维处理：取消连续概率，使用非黑即白的二元状态突变
-            new_posterior = 1.0 if obs_score >= 0.85 else 0.0
+            # 【修复】使用 0.99 和 0.01 防止后续 KL 散度计算时对数溢出 (Math Domain Error)
+            new_posterior = 0.99 if obs_score >= 0.85 else 0.01
             
-            # 只有当状态发生 0->1 或 1->0 的突变时才记录更新
+            # 只有当状态发生突变时才记录更新
             if abs(new_posterior - prior) > 0.5:
+                # 【核心修复】：不使用象征性的 1.0，计算极其暴力的真实断层 KL 散度
+                real_kl_shock = tracer.calculate_kl_divergence(prior, new_posterior)
+                
                 new_kc_state = kc_state.model_copy(update={
                     "prior_prob": prior,
                     "posterior_prob": new_posterior,
-                    "kl_divergence": 0.0
+                    "kl_divergence": real_kl_shock
                 })
                 partial_updated_kcs[kc_id] = new_kc_state
-                total_kl_shift += 1.0  # 象征性地记录一次状态跳变
-                logger.debug(f"LLMKT [离散降维模式]: {kc_id} 状态突变为 {new_posterior}")
+                total_kl_shift += real_kl_shock
+                logger.debug(f"LLMKT [离散降维模式]: {kc_id} 发生剧烈认知跳变, 真实 KL 散度高达 {real_kl_shock:.4f}")
         else:
             # 原始完整版逻辑：连续贝叶斯追踪
             new_posterior, kl_div = tracer.update_kc_state(prior, obs_score)
@@ -193,6 +201,9 @@ def llmkt_bayesian_update_step(state: GraphState) -> Dict[str, Any]:
     if total_kl_shift > 0:
         logger.debug(f"LLMKT 局部状态更新完成, 整体认知增益/跳变: {total_kl_shift:.4f}")
     
+    # 汇总本轮大模型的裁判打分
+    score_details = " | ".join([f"{kc_id}: {kcs.posterior_prob:.2f}" for kc_id, kcs in partial_updated_kcs.items()])
+    logger.info(f"🧠 [LLMKT 追踪战报] 本轮对话后，学生最新认知状态: {score_details}")
     # 返回 diff 字典：LangGraph 底层的 merge_kcs 会将 partial_updated_kcs 安全地合并回主树
     return {
         "student_kcs": partial_updated_kcs,

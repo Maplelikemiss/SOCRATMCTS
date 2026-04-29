@@ -72,18 +72,37 @@ def run_evaluation_pipeline(
             initial_state = build_initial_graph_state(
                 item, 
                 base_persona=persona, 
-                max_turns=8, 
+                max_turns=10, 
                 experiment_mode=mode
             )
             
-            # 【终极拦截补丁】强制抹除 evaluation/utils.py 内部可能残留的 0.5 历史遗留！
-            initial_state["student_kcs"] = {
-                "target_bug_understanding": BayesianKnowledgeState(
-                    kc_id="target_bug_understanding",
-                    prior_prob=0.2,     # 强制上锁 0.2
-                    posterior_prob=0.2  # 强制上锁 0.2
+            # =================================================================
+            # 【全新多维 KC 注入逻辑】
+            # 读取新版数据集中的 kcs 数组，包含拓扑依赖 (prerequisites) 和描述
+            # =================================================================
+            multi_kcs = item.get("kcs", [])
+            student_kcs_dict = {}
+
+            if multi_kcs:
+                for kc in multi_kcs:
+                    student_kcs_dict[kc["kc_id"]] = BayesianKnowledgeState(
+                        kc_id=kc["kc_id"],
+                        description=kc.get("description", ""),
+                        prerequisites=kc.get("prerequisites", []),
+                        prior_prob=0.2,     # 坚守悲观初始化红线
+                        posterior_prob=0.2
+                    )
+            else:
+                # 兼容旧版本只有单 target_kc 或没有 kc 字段的数据集
+                legacy_kc_id = item.get("target_kc", "target_bug_understanding")
+                student_kcs_dict[legacy_kc_id] = BayesianKnowledgeState(
+                    kc_id=legacy_kc_id,
+                    prior_prob=0.2,
+                    posterior_prob=0.2
                 )
-            }
+                
+            initial_state["student_kcs"] = student_kcs_dict
+            # =================================================================
             
             # 【核心注入】确保图状态中拥有空白的历史数组起步
             initial_state["verifier_history"] = []
@@ -177,7 +196,7 @@ def run_evaluation_pipeline(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SocratMCTS 批量评估引擎")
-    parser.add_argument("--dataset", type=str, default="SocratDataset.json", help="数据集 JSON 文件路径")
+    parser.add_argument("--dataset", type=str, default="SocratDataset_Multi_KC", help="数据集 JSON 文件路径")
     # 【修改点】改为接收 output_dir，而不是具体的文件名
     parser.add_argument("--output_dir", type=str, default="evaluation_results", help="结果输出目录")
     parser.add_argument("--sample_size", type=int, default=1, help="限制测试样本量 (-1 表示全量测试)")
@@ -206,10 +225,21 @@ if __name__ == "__main__":
         
         mock_data = [
             {
-                "id": "mock_001",
+                "id": "mock_001_multi_debug",
                 "problem_description": "写一个函数实现两数之和。",
                 "buggy_code": "def twoSum(nums, target):\n    for i in range(len(nums)):\n        if nums[i] + nums[i+1] == target: return [i, i+1]",
-                "target_kc": "array_index_out_of_bounds"
+                "kcs": [
+                    {
+                        "kc_id": "kc_index_out_of_bounds",
+                        "description": "理解 i+1 会导致数组越界，外层循环应当是 range(len(nums) - 1)。",
+                        "prerequisites": []
+                    },
+                    {
+                        "kc_id": "kc_logic_combination",
+                        "description": "理解当前逻辑只检查了相邻元素，而非所有组合，需使用双层循环或哈希表。",
+                        "prerequisites": ["kc_index_out_of_bounds"]
+                    }
+                ]
             }
         ]
         with open("mock_dataset.json", "w", encoding="utf-8") as f:

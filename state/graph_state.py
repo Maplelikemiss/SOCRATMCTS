@@ -30,6 +30,9 @@ def merge_kcs(left: Dict[str, 'BayesianKnowledgeState'], right: Dict[str, 'Bayes
 class BayesianKnowledgeState(BaseModel):
     """连续贝叶斯知识追踪 (LLMKT) 的微观状态"""
     kc_id: str = Field(..., description="知识组件(KC)或 Bug 类型的唯一标识")
+    # === 【新增支持多漏洞依赖拓扑的字段】 ===
+    description: str = Field(default="", description="该知识点的具体自然语言描述")
+    prerequisites: List[str] = Field(default_factory=list, description="前置依赖的 kc_id 列表")
     # 【核心修改】彻底贯彻悲观初始化，将默认值从 0.5 降到 0.2
     prior_prob: float = Field(default=0.2, description="先验概率 P(L)")
     posterior_prob: float = Field(default=0.2, description="贝叶斯后验概率 P(L|Obs)，范围 0~1")
@@ -43,6 +46,8 @@ class GraphState(TypedDict):
     # 2. 认知追踪与推演状态
     # 【关键修复】引入 merge_kcs 归约器，杜绝字典被整体覆写
     student_kcs: Annotated[Dict[str, BayesianKnowledgeState], merge_kcs]
+    # === 【新增焦点字段】 ===
+    current_focus_kc: Optional[str]
     current_strategy: Optional[Dict[str, Any]]
     
     # 【修复这一行：增加 operator.add 累加器】

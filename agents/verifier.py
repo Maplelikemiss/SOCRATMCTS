@@ -158,9 +158,9 @@ class GlobalEvaluatorAgent:
         你的输出必须完全匹配以下 JSON 结构（键名严格小写，值为 0.2 到 1.0 之间的浮点数）：
         {{
             "logicality": 0.6,
-            "repetitiveness": 0.8,
+            "repetitiveness": 0.6,
             "guidance": 0.6,
-            "flexibility": 0.8,
+            "flexibility": 0.6,
             "clarity": 0.6
         }}
         """

@@ -94,29 +94,30 @@ class ConsultantAgent:
         【代码输出约束（生死红线）】：
         1. 常规情况下：在编写 "tactical_draft" 时，【绝对不允许】包含任何具体的 Python 代码！你的草案只能是自然语言的指导策略（例如：“请反问学生列表长度和最大索引之间的数学关系”）。
         2. 唯一的例外（Direct_Correction）：只有当 MCTS 下发的 `strategy_type` 明确为 "Direct_Correction" 时，你【必须】在草案中直接写出正确的 Python 修复代码，以便 Teacher 准确下发给学生。除此动作外，出现任何代码块均视为严重违规。
+        【多重 Bug 隔离法则 (极其重要)】
+        由于学生代码中可能存在多个具备依赖关系的 Bug，你收到的指令中会指定一个 `focus_kc_id`（当前聚焦知识点）。
+        你必须在 `tactical_draft` 中严格命令 Teacher：【本轮对话只能围绕这一个指定的考点进行引导】！
+        对于代码中存在的其他错误，必须做到“视而不见”，绝对不能一口气指出所有 Bug，以维持苏格拉底教学的脚手架梯度。
         """
 
-    def generate_strategy(self, state: GraphState, mcts_action: str) -> Dict[str, Any]:
+    def generate_strategy(self, state: GraphState, mcts_action: str, focus_kc_id: str) -> Dict[str, Any]:
         """
         调用 LLM 将 MCTS 的宏观动作细化为具体的 JSON 策略。
         """
-        # 1. 提取当前认知画像 (寻找薄弱点)
+        # 1. 提取被 MCTS 引擎锁定的焦点知识点信息
         student_kcs = state.get("student_kcs", {})
-        weakest_kc_id = "general_understanding"
-        weakest_prob = 1.0
+        focus_kc_state = student_kcs.get(focus_kc_id)
         
-        for kc_id, kc_state in student_kcs.items():
-            if kc_state.posterior_prob < weakest_prob:
-                weakest_prob = kc_state.posterior_prob
-                weakest_kc_id = kc_id
+        prob = focus_kc_state.posterior_prob if focus_kc_state else 1.0
+        kc_desc = getattr(focus_kc_state, "description", focus_kc_id) if focus_kc_state else focus_kc_id
                 
-        # 2. 组装给 Consultant LLM 的上下文提示
+        # 2. 组装给 Consultant LLM 的上下文提示，强调绝对聚焦
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
             ("user", "【系统环境指令】\n"
                      "MCTS 引擎已规划当前的最佳宏观动作为: {mcts_action}\n"
-                     "系统检测到学生当前最薄弱的知识点/Bug为: {weakest_kc} (掌握概率: {prob:.2f})\n"
+                     "MCTS 引擎强制锁定的当前教学焦点/Bug为: 【{kc_desc}】 (掌握概率: {prob:.2f})\n"
                      "请基于上述信息，输出给 Teacher 的指导策略。以严格的 JSON 格式输出。")
         ])
         
@@ -127,19 +128,21 @@ class ConsultantAgent:
             strategy_obj = chain.invoke({
                 "chat_history": state.get("messages", []),
                 "mcts_action": mcts_action,
-                "weakest_kc": weakest_kc_id,
-                "prob": weakest_prob
+                "kc_desc": kc_desc,
+                "prob": prob
             })
-            return strategy_obj.model_dump()
+            res = strategy_obj.model_dump()
+            # 强制覆盖，确保返回的 JSON 严格遵从上游指定的 kc_id
+            res["focus_kc_id"] = focus_kc_id 
+            return res
             
         except Exception as e:
             logger.error(f"Consultant 策略生成失败，使用降级兜底策略: {e}")
-            # 兜底容错机制，防止 LangGraph 崩溃
             return {
                 "strategy_type": mcts_action,
-                "focus_kc_id": weakest_kc_id,
+                "focus_kc_id": focus_kc_id,
                 "internal_reasoning": "大模型生成异常，启用系统默认兜底推理。",
-                "tactical_draft": "请继续使用苏格拉底式提问引导学生思考当前的代码逻辑。"
+                "tactical_draft": "【系统回退指令】：引导学生思考当前指定的逻辑漏洞，绝对不允许直接输出完整的修复代码。"
             }
 
 # ==========================================
@@ -174,33 +177,32 @@ def consultant_node_step(state: GraphState) -> Dict[str, Any]:
     # 【核心分支控制】根据实验模式调整推演深度
     if mode == "Ablation_No_MCTS":
         logger.info("-> [消融模式] Ablation_No_MCTS: 关闭 MCTS 树搜索，退化为直接贪心提问")
-        # 直接跳过推演引擎，给定一个基础宏观动作
         best_action = "Elicit_Questioning"
+        focus_kc = weakest_kc  # 无 MCTS 规划，退化为贪心寻找最弱点
         
     elif mode == "TreeInstruct_Baseline":
         logger.info("-> [基线模式] TreeInstruct_Baseline: 启用 MCTS 但限制最大深度为 0 (单步局部贪心)")
-        # 【修复点】正确传参，只传 state！
         planner = MCTSPlanner(num_trees=4, simulations_per_tree=3, max_depth=0)
         mcts_result = planner.search(state)
         best_action = mcts_result.get("strategy_type", "Elicit_Questioning")
+        focus_kc = mcts_result.get("target_kc") or weakest_kc # 【新增提取】
         
     else:
-        # Socrat_Full 或 Ablation_No_LLMKT (保持 MCTS 推演)
         logger.info("-> 启用完整 MCTS 潜空间并行推演")
-        # 【修复点】正确传参，只传 state！
         planner = MCTSPlanner(num_trees=4, simulations_per_tree=3, max_depth=2)
         mcts_result = planner.search(state)
         best_action = mcts_result.get("strategy_type", "Elicit_Questioning")
+        focus_kc = mcts_result.get("target_kc") or weakest_kc # 【新增提取】
 
-    # 将敲定的宏观动作 (best_action) 交由 70B 大模型扩展为具体的 JSON 战术草案
-    detailed_strategy = agent.generate_strategy(state, best_action)
+    # 【修复参数】：将敲定的宏观动作 (best_action) 和焦点 (focus_kc) 交由大模型扩展
+    detailed_strategy = agent.generate_strategy(state, best_action, focus_kc)
 
     # 【终极安全红线校验】无论哪种模式，策略生成失败或缺失字段时的保守 Fallback
     if not detailed_strategy or "strategy_type" not in detailed_strategy:
         logger.warning("⚠️ 策略推演返回异常或格式损坏，触发保守后备策略。")
         detailed_strategy = {
             "strategy_type": "Elicit_Questioning",
-            "focus_kc_id": weakest_kc,
+            "focus_kc_id": focus_kc, # 【修复使用 focus_kc】
             "internal_reasoning": "Fallback strategy due to generation error.",
             "tactical_draft": "【系统回退指令】：引导学生思考当前代码的逻辑漏洞，绝对不允许直接输出完整的修复代码。"
         }

@@ -15,5 +15,6 @@ env/
 .vscode/
 
 #忽略整个文件夹及其里面的所有内容
-#evaluation_results/
+evaluation_results/
 SocratDataset.json
+SocratDataset_Multi_KC.json

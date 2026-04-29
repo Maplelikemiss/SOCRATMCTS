@@ -134,7 +134,7 @@ def should_continue_teaching(state: GraphState) -> str:
     """
     mode = state.get("experiment_mode", "Socrat_Full")
     turn_count = state.get("turn_count", 0)
-    max_turns = state.get("max_turns", 8)
+    max_turns = state.get("max_turns", 10)
 
     # 1. 【核心逻辑】：提取历史所有轮次的 Bug 解决率，并计算最大值
     history = state.get("verifier_history", [])
@@ -178,9 +178,16 @@ def should_continue_teaching(state: GraphState) -> str:
     if mode == "Vanilla_Prompting":
         kc_threshold_met = True
 
-    # 打印日志（使用锁定后的分数，方便监视）
-    logger.info(f"【图流转判定】模式: {mode} | 画像: {persona_label} | 轮次: {turn_count}/{max_turns} | 目标KC阈值: {target_threshold} | 历史最大Bug修复率: {effective_bug_resolved:.2f} | 最低KC掌握度: {lowest_prob:.2f}")
+    if student_kcs:
+        kc_status_str = " | ".join([f"{kc_id}: {kc_state.posterior_prob:.2f}" for kc_id, kc_state in student_kcs.items()])
+    else:
+        kc_status_str = "未初始化"
 
+    logger.info(
+        f"【图流转判定】模式: {mode} | 画像: {persona_label} | 轮次: {turn_count}/{max_turns} | 目标KC阈值: {target_threshold} | 历史最大Bug修复率: {effective_bug_resolved:.2f}\n"
+        f" 📊 当前认知矩阵进度: [ {kc_status_str} ]"
+    )
+    
     # --- 终止逻辑开始 ---
 
     # 终止条件 A：达到最大轮次强制终止
