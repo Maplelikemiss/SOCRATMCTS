@@ -1,0 +1,21 @@
+[
+  {
+    "id": "mock_001_multi_debug",
+    "problem_description": "写一个函数实现两数之和。",
+    "buggy_code": "def twoSum(nums, target):\n    for i in range(len(nums)):\n        if nums[i] + nums[i+1] == target: return [i, i+1]",
+    "kcs": [
+      {
+        "kc_id": "kc_index_out_of_bounds",
+        "description": "理解 i+1 会导致数组越界，外层循环应当是 range(len(nums) - 1)。",
+        "prerequisites": []
+      },
+      {
+        "kc_id": "kc_logic_combination",
+        "description": "理解当前逻辑只检查了相邻元素，而非所有组合，需使用双层循环或哈希表。",
+        "prerequisites": [
+          "kc_index_out_of_bounds"
+        ]
+      }
+    ]
+  }
+]
