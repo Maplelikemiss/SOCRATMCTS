@@ -196,10 +196,10 @@ def run_evaluation_pipeline(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SocratMCTS 批量评估引擎")
-    parser.add_argument("--dataset", type=str, default="SocratDataset_Multi_KC", help="数据集 JSON 文件路径")
+    parser.add_argument("--dataset", type=str, default="SocratDataset_Multi_KC.json", help="数据集 JSON 文件路径")
     # 【修改点】改为接收 output_dir，而不是具体的文件名
     parser.add_argument("--output_dir", type=str, default="evaluation_results", help="结果输出目录")
-    parser.add_argument("--sample_size", type=int, default=1, help="限制测试样本量 (-1 表示全量测试)")
+    parser.add_argument("--sample_size", type=int, default=2, help="限制测试样本量 (-1 表示全量测试)")
     
     # 【新增点】添加 mode 选项控制实验变量
     parser.add_argument(
