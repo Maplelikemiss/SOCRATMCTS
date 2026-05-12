@@ -66,3 +66,7 @@ class GraphState(TypedDict):
     student_persona: str
     turn_count: int
     max_turns: int
+
+    # === 【本次新增：死锁感知字段】 ===
+    consecutive_low_kl_turns: int  # 连续未发生认知跳变的轮数
+    is_deadlocked: bool            # 当前是否处于对抗死锁状态

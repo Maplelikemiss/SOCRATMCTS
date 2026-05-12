@@ -201,6 +201,32 @@ def llmkt_bayesian_update_step(state: GraphState) -> Dict[str, Any]:
     if total_kl_shift > 0:
         logger.debug(f"LLMKT 局部状态更新完成, 整体认知增益/跳变: {total_kl_shift:.4f}")
     
+    # === 【本次新增：死锁感知逻辑 (Deadlock Detector)】 ===
+    consecutive_low_kl_turns = state.get("consecutive_low_kl_turns", 0)
+    
+    # 1. 认知停滞检测：如果本轮总 KL 散度极小（未发生实质认知转移），计数器加 1；否则清零
+    if total_kl_shift < 1e-3:
+        consecutive_low_kl_turns += 1
+    else:
+        consecutive_low_kl_turns = 0
+        
+    # 2. 抗拒情绪检测：提取最新的一条学生消息
+    is_resistant = False
+    if messages:
+        for msg in reversed(messages):
+            if msg.type == "human" or getattr(msg, "name", "") == "student":
+                # 匹配典型的对抗、崩溃或直接索要答案的词汇
+                if re.search(r'(听不懂|太难|直接写|直接告诉|直接给|不会|烦|不明白|不想思考)', msg.content):
+                    is_resistant = True
+                break
+                
+    # 3. 触发死锁警报：连续 2 轮无认知增益 且 存在抗拒情绪
+    is_deadlocked = (consecutive_low_kl_turns >= 2) and is_resistant
+    
+    if is_deadlocked:
+        logger.warning("🚨 [死锁警报] 检测到学生认知停滞且情绪抗拒，系统已进入 Deadlock 状态！")
+    # ========================================================
+
     # 汇总本轮大模型的裁判打分
     score_details = " | ".join([f"{kc_id}: {kcs.posterior_prob:.2f}" for kc_id, kcs in partial_updated_kcs.items()])
     logger.info(f"🧠 [LLMKT 追踪战报] 本轮对话后，学生最新认知状态: {score_details}")

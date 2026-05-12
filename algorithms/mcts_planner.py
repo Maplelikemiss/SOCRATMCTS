@@ -47,6 +47,13 @@ class MCTSNode:
             explore = exploration_weight * math.sqrt(math.log(self.visits) / child.visits)
             score = exploit + explore
             
+            # === 【本次新增：死锁破局偏置 (Heuristic PUCT)】 ===
+            # 如果全局状态判定为死锁，强制给“降维动作”极高的先验分数，迫使 MCTS 放弃死磕语法，优先探索这些分支
+            if self.state.get("is_deadlocked", False):
+                if child.action and ("Role_Reversal" in child.action or "Provide_Hint" in child.action):
+                    score += 100.0  # 极其巨大的偏置，确保立刻被选中探索
+            # ===================================================
+
             if score > best_score:
                 best_score = score
                 best_node = child
@@ -292,6 +299,19 @@ class MCTSPlanner:
         target_kc_id = None
         if "|" in action:
             strategy, target_kc_id = action.split("|", 1)
+
+        # === 【本次新增：死锁状态奖励干预 (Deadlock Shaping)】 ===
+        is_deadlocked = state.get("is_deadlocked", False)
+        if is_deadlocked:
+            if strategy == "Elicit_Questioning":
+                # 学生已经崩溃，继续硬问语法只会激化矛盾，施加严重衰减惩罚
+                reward *= 0.1 
+                logger.debug(f"🚫 [MCTS 剪枝] 死锁状态下禁止死磕，动作 {action} 奖励被衰减至 {reward:.2f}")
+            elif strategy == "Role_Reversal" or strategy == "Provide_Hint":
+                # 鼓励系统在这种时候退让，给予极高保底奖励
+                reward = max(reward, 0.9)
+                logger.debug(f"✨ [MCTS 激励] 死锁状态下探测到破局动作 {action}，奖励被拉升至 {reward:.2f}")
+        # =========================================================
 
         # 1. 毁灭性打击：直接给答案 (绝对守护 NDAR 红线)
         if strategy == "Direct_Correction":
