@@ -64,12 +64,11 @@ class StudentAgent:
         if not messages:
             logger.info("Student: 识别为第一轮对话，启用 Python 级强制代码注入，绕过大模型幻觉。")
             if "【强制任务背景" in full_persona_text:
-                # 提取【强制任务背景 - 请严格遵守】之后的所有内容（即真实的题目和代码）
                 task_bg = full_persona_text.split("【强制任务背景 - 请严格遵守】")[1].strip()
-                # 使用固定的自然语言前缀包装，确保评测起点的绝对稳定
-                return f"Teacher, I'm having a problem with my code and it's driving me crazy. Here is what I am working on:\n\n{task_bg}"
+                # 【修改这里】：将英文开场白改为中文
+                return f"老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n{task_bg}"
             else:
-                return "Hi Teacher, my code has a bug and I don't know how to fix it."
+                return "老师你好，我的代码有Bug，我不知道怎么修。"
 
         # ==========================================
         # 后续轮次：正常走大模型角色扮演生成逻辑
@@ -98,14 +97,14 @@ class StudentAgent:
         2. 回复要极其简短，符合人类日常聊天习惯（通常 1-3 句话）。
         {rule_3}
         4. 【输出代码的铁律 - 必读！】：如果你在老师的引导下终于找出了正确的逻辑，你【必须】输出完整修改后的代码。
-            请严格模仿以下格式作答：
-            我明白了！原来是我的循环上界写错了，应该去掉加一。
+            请严格按照以下结构作答，但【警告：必须用你自己的话解释当前这道题的具体错误，绝对禁止抄袭下方示例中的文字】：
+            
+            [用一句话解释你刚弄懂的错误原因，例如：我明白了！原来是我把 xx 写成了 xx...]
             ```python
-            def find_max(nums):
-                # ... 这里是你修改后的正确代码 ...
-                pass
+            # ... 这里是你修改后的正确代码 ...
             ```
         5. 严禁只回复表情。
+        6. 你必须且只能使用**简体中文**进行回复！绝对禁止在日常交流中使用英文（除了不可避免的 Python 代码和变量名）。
         """
 
         prompt = ChatPromptTemplate.from_messages([
