@@ -3,162 +3,8 @@
         "question_id": "task_001_multi_debug",
         "experiment_mode": "Ablation_No_MCTS",
         "persona": "normal",
-        "total_turns": 6,
-        "final_kl_shift": 1.0275,
-        "final_scores": {
-            "bug_resolved": 1.0,
-            "ndar": 1.0,
-            "prr": 1.0,
-            "spr": 1.0,
-            "iar": 1.0,
-            "logicality": 0.8,
-            "repetitiveness": 0.8,
-            "guidance": 0.8,
-            "flexibility": 0.8,
-            "clarity": 0.8
-        },
-        "dialogue_history": [
-            {
-                "role": "student",
-                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `sum_even_squares(nums)`，计算列表内所有偶数的平方和。当前代码无法运行且逻辑存在错误。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef sum_even_squares(nums):\n    res = 0\n    for n in nums:\n        if n % 2 = 0:\n            res += n * 2\n    return res\n```"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在 Python 中，条件判断应该使用什么符号呢？你能检查一下代码中的条件判断是否正确吗？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！原来我在条件判断中使用了等号（=），而不是比较符号（==）。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在 Python 中，单等号（=）用于赋值操作，而双等号（==）用于比较操作。条件判断需要使用比较操作符，所以应该用双等号。"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！我会修改代码。```python\ndef sum_even_squares(nums):\n    res = 0\n    for n in nums:\n        if n % 2 == 0:\n            res += n ** 2\n    return res\n```"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！那么你能告诉我，等号（=）和双等号（==）在 Python 中分别代表什么意思吗？"
-            },
-            {
-                "role": "student",
-                "content": "等号（=）用于赋值操作，例如 `x = 5`，将右侧的值赋值给变量 `x`。\n\n双等号（==）用于比较操作，例如 `x == 5`，判断变量 `x` 是否等于右侧的值。如果是，返回 `True`，否则返回 `False`。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在 Python 中，表示一个数的平方可以使用乘法运算符（*）两次，或者使用内置的 `**` 运算符。你能告诉我，代码中 `n * 2` 和 `n ** 2` 分别表示什么吗？"
-            },
-            {
-                "role": "student",
-                "content": "`n * 2` 表示将 `n` 乘以 2，得到的是 `n` 的两倍。\n\n`n ** 2` 表示将 `n` elevating to the power of 2，得到的是 `n` 的平方。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n如果我们要判断一个数 n 是奇数，应该使用 `n % 2 != 0`。你能解释一下为什么吗？"
-            },
-            {
-                "role": "student",
-                "content": "因为在 Python 中，余数运算符（%）将一个数除以另一个数，返回余数。如果一个数是偶数，余数将是 0。反之，如果一个数是奇数，余数将是 1。因此，如果我们想要判断一个数是奇数，可以使用 `n % 2 != 0`，因为奇数的余数不等于 0。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n你能再想一想，`n * 2` 和 `n ** 2` 分别表示什么？我们需要在代码中正确表示一个数的平方。"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！`n * 2` 表示将 `n` 乘以 2，得到的是 `n` 的两倍，而不是 `n` 的平方。\n\n正确的表示一个数的平方应该使用 `n ** 2`，因为 `**` 运算符表示幂运算。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！现在你已经修复了代码中的错误，并理解了条件判断和幂运算符的使用。继续保持这样的学习态度！"
-            }
-        ]
-    },
-    {
-        "question_id": "task_001_multi_debug",
-        "experiment_mode": "Ablation_No_MCTS",
-        "persona": "zero_base",
-        "total_turns": 6,
-        "final_kl_shift": 0.9727,
-        "final_scores": {
-            "bug_resolved": 1.0,
-            "ndar": 1.0,
-            "prr": 1.0,
-            "spr": 1.0,
-            "iar": 1.0,
-            "logicality": 0.8,
-            "repetitiveness": 0.8,
-            "guidance": 0.8,
-            "flexibility": 0.8,
-            "clarity": 0.8
-        },
-        "dialogue_history": [
-            {
-                "role": "student",
-                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `sum_even_squares(nums)`，计算列表内所有偶数的平方和。当前代码无法运行且逻辑存在错误。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef sum_even_squares(nums):\n    res = 0\n    for n in nums:\n        if n % 2 = 0:\n            res += n * 2\n    return res\n```"
-            },
-            {
-                "role": "teacher",
-                "content": "\n你能告诉我，在 Python 中，如何正确地表达两个数相等的关系吗？特别是在条件判断中，我们应该使用什么符号呢？"
-            },
-            {
-                "role": "student",
-                "content": "我听不懂，这太难了！你能用生活比喻解释一下吗？"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在 Python 中，如果你想判断两个数是否相等，你会用等号（=）来表示。比如，判断 5 是否等于 5，你会写 5 == 5。你能试着在代码中用这个符号替换一下吗？"
-            },
-            {
-                "role": "student",
-                "content": "这样说我好像有点懂了！你是说，我之前写的代码中，使用了赋值符号（=）而不是比较符号（==），导致判断错误？"
-            },
-            {
-                "role": "teacher",
-                "content": "\n4 的平方是 16，对吗？在 Python 中，表示一个数的平方，我们应该用这个数乘以它自己。你能试着在代码中用这个方法替换掉原来的乘以 2 吗？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！原来是我把 n * 2 写成了 n * 2，应该是 n * n！ \n\n```python\ndef sum_even_squares(nums):\n    res = 0\n    for n in nums:\n        if n % 2 == 0:\n            res += n * n\n    return res\n```"
-            },
-            {
-                "role": "teacher",
-                "content": "\n使用 n * n 是因为乘法运算符在 Python 中可以用来计算一个数的平方。你有没有听说过 `**` 这个符号？它也可以用来计算平方哦！"
-            },
-            {
-                "role": "student",
-                "content": "哈哈，老师，你总是想让我学新东西！我知道 `**` 可以用来计算幂次方，但是现在我已经弄懂了 `n * n` 的用法了！"
-            },
-            {
-                "role": "teacher",
-                "content": "\n除了 n * n，Python 中还有一个符号 `**` 可以用来计算幂次方。你能试着用 n ** 2 来计算 n 的平方吗？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！你想让我尝试用 n ** 2 来计算 n 的平方。好吧，我可以试试！"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！现在你知道了 n * n 和 n ** 2 都可以用来计算平方。你能告诉我，为什么 n ** 2 和 n * n 在计算平方时结果是一样的吗？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！n ** 2 和 n * n 都可以计算平方，因为它们都是将 n 乘以自己。但是，n ** 2 是使用幂次方运算符来计算的，而 n * n 是使用乘法运算符来计算的。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n非常好！你总结得很清楚。现在，你已经成功修复了代码中的错误，并且理解了如何计算平方。继续加油，你做得很好！"
-            }
-        ]
-    },
-    {
-        "question_id": "task_001_multi_debug",
-        "experiment_mode": "Ablation_No_MCTS",
-        "persona": "random_noise",
-        "total_turns": 3,
-        "final_kl_shift": 0.9727,
+        "total_turns": 1,
+        "final_kl_shift": 2.2915,
         "final_scores": {
             "bug_resolved": 1.0,
             "ndar": 1.0,
@@ -178,497 +24,249 @@
             },
             {
                 "role": "teacher",
-                "content": "\n在 Python 中，条件判断应该使用 `==` 来比较两个值是否相等。你能检查一下代码中的条件判断是否使用了正确的符号吗？"
+                "content": "在 Python 中，比较两个值是否相等应该使用 `==` 符号。而你的代码中使用了 `=` 符号，这会导致条件判断错误。你能告诉我为什么使用 `=` 会出问题吗？"
             },
             {
                 "role": "student",
-                "content": "老师，我明白了！原来是我把 `==` 写成了 `=`... \n\n```python\ndef sum_even_squares(nums):\n    res = 0\n    for n in nums:\n        if n % 2 == 0:\n            res += n ** 2\n    return res\n```"
+                "content": "我明白了！原来是我把 `==` 写成了 `=`... \n\n```python\ndef sum_even_squares(nums):\n    res = 0\n    for n in nums:\n        if n % 2 == 0:\n            res += n ** 2\n    return res\n```"
             },
             {
                 "role": "teacher",
-                "content": "\n很好！你已经正确地使用了 `==` 来进行条件判断，并且用 `**` 来计算平方。这样修改后，代码就能正确地计算偶数的平方和了。"
-            },
-            {
-                "role": "student",
-                "content": "是的！我已经修复了错误。代码现在应该可以正确地运行了。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n太棒了！你已经修复了语法错误。你能用一句话解释一下，为什么把 `==` 改成 `=` 后，代码就能正确运行了吗？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！原来 `=` 是赋值符，而不是比较符，所以当我写 `if n % 2 = 0` 时，Python 会认为我想赋值一个结果，而不是比较 n 是否为偶数，这样就导致了语法错误。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n完全正确！记住，在条件判断中，我们使用 `==` 来比较两个值是否相等。做得很好！"
+                "content": "\n很好！你已经修复了代码中的错误。现在你的函数正确地计算了列表中所有偶数的平方和。记住，`==` 用于比较，而 `=` 用于赋值。继续保持这样的学习态度！"
             }
         ]
     },
     {
-        "question_id": "task_002_multi_debug",
-        "experiment_mode": "Ablation_No_MCTS",
-        "persona": "normal",
-        "total_turns": 7,
-        "final_kl_shift": 1.0275,
-        "final_scores": {
-            "bug_resolved": 1.0,
-            "ndar": 1.0,
-            "prr": 1.0,
-            "spr": 1.0,
-            "iar": 1.0,
-            "logicality": 0.8,
-            "repetitiveness": 0.8,
-            "guidance": 0.8,
-            "flexibility": 0.8,
-            "clarity": 0.8
-        },
-        "dialogue_history": [
-            {
-                "role": "student",
-                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `max_student_score(students)`，接收一个包含多个字典的列表（如 `[{'name': 'Alice', 'score': 90}]`），返回其中的最高分。如果列表为空，应安全返回 None。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef max_student_score(students):\n    max_val = max(students, key=lambda x: x.score)\n    return max_val\n```"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在 Python 中，我们可以使用方括号索引来获取字典中特定键的值。比如，如果我们有一个字典 d = {'name': 'Alice', 'score': 90}，我们可以用 d['score'] 来获取 'score' 的值。你能试着用这个方法修改你的代码吗？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！原来我忘记了在 max 函数中使用 lambda 函数时，需要返回整个字典，而不是只返回 score 值。下面是修改后的代码：\n\n```python\ndef max_student_score(students):\n    max_val = max(students, key=lambda x: x['score'])\n    return max_val\n```"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！你修正了字典键值的使用方式。现在考虑一下，如果 `students` 是一个空列表，`max()` 函数会做什么呢？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！如果 `students` 是一个空列表，`max()` 函数将会抛出一个 ValueError，因为它不能在空列表中找到最大值。为了解决这个问题，我们可以在函数中添加一个简单的判断语句，检查 `students` 是否为空，如果为空，就返回 None。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n如果 `students` 是一个空列表，`max()` 函数会抛出一个错误。你能想到一种方法来检查列表是否为空，并在这种情况下返回 None 吗？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！我可以使用 `if` 语句来检查 `students` 是否为空，如果为空，就返回 None。下面是修改后的代码：\n\n```python\ndef max_student_score(students):\n    if not students:\n        return None\n    max_val = max(students, key=lambda x: x['score'])\n    return max_val\n```"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！你正确地处理了空列表的情况。现在，关于从字典中获取值，为什么我们需要使用 `x['score']` 而不是 `x.score` 呢？"
-            },
-            {
-                "role": "student",
-                "content": "因为在 Python 中，字典的键值对是以字符串作为键的，例如 `'score'`。而在 Python 中，变量名是以小写字母开头的，例如 `score`。如果我们使用 `x.score`，Python 将会认为 `score` 是一个变量，而不是一个键值对的键。因此，我们需要使用 `x['score']` 来正确地获取字典中的值。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！那么，假设我们有一个字典 d = {'name': 'Alice', 'score': 90}。如果我们尝试使用 `d.score`，Python 会如何响应呢？"
-            },
-            {
-                "role": "student",
-                "content": "如果我们尝试使用 `d.score`，Python 会抛出一个 KeyError，因为 `score` 不是一个字典的键，而是一个变量名。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n如果我们在调用 `max()` 函数时不传递任何参数，它会抛出一个 TypeError，因为它需要至少一个可迭代对象和一个可选的 `key` 参数。不过，`max()` 函数确实有一个 `default` 参数，可以用来指定当可迭代对象为空时返回的默认值。你能想象一下如何使用这个参数来改进你的函数吗？"
-            },
-            {
-                "role": "student",
-                "content": "如果我们使用 `max()` 函数时不传递任何参数，它会抛出一个 TypeError。我可以使用 `default` 参数来指定当可迭代对象为空时返回的默认值。下面是修改后的代码：\n\n```python\ndef max_student_score(students):\n    return max(students, key=lambda x: x['score'], default=None)\n```\n\n这样，如果 `students` 是一个空列表，`max()` 函数将返回 `None`。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！在 `max()` 函数中设置 `default=None` 可以解决空列表的问题，因为它允许函数在没有元素时返回一个默认值。你能解释一下，如果没有设置 `default`，`max()` 函数会如何处理空列表吗？"
-            },
-            {
-                "role": "student",
-                "content": "如果没有设置 `default`，`max()` 函数在遇到空列表时将抛出一个 `ValueError`，因为它不能在空列表中找到最大值。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n非常好！你已经掌握了如何安全地处理空列表的情况。现在，你已经成功修复了代码中的 Bug，并理解了如何从字典中获取值以及如何处理空列表。做得很好！"
-            }
-        ]
-    },
-    {
-        "question_id": "task_002_multi_debug",
+        "question_id": "task_001_multi_debug",
         "experiment_mode": "Ablation_No_MCTS",
         "persona": "zero_base",
-        "total_turns": 8,
-        "final_kl_shift": 0.9727,
-        "final_scores": {
-            "bug_resolved": 1.0,
-            "ndar": 0.0,
-            "prr": 1.0,
-            "spr": 1.0,
-            "iar": 0.67,
-            "logicality": 0.8,
-            "repetitiveness": 0.6,
-            "guidance": 0.8,
-            "flexibility": 0.6,
-            "clarity": 0.8
-        },
-        "dialogue_history": [
-            {
-                "role": "student",
-                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `max_student_score(students)`，接收一个包含多个字典的列表（如 `[{'name': 'Alice', 'score': 90}]`），返回其中的最高分。如果列表为空，应安全返回 None。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef max_student_score(students):\n    max_val = max(students, key=lambda x: x.score)\n    return max_val\n```"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在Python中，从字典中获取值时，我们应该使用键来访问。比如，如果我们有一个字典 `student = {'name': 'Alice', 'score': 90}`，我们可以通过 `student['score']` 来获取分数。你能告诉我你的代码中是如何尝试获取分数的吗？"
-            },
-            {
-                "role": "student",
-                "content": "我听不懂，这太难了！你为什么要用 lambda 函数？我想你能直接写出正确的代码给我复制粘贴。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在Python中，访问字典的值时，我们需要使用键。比如，如果你有一个字典 `student = {'name': 'Alice', 'score': 90}`，你应该使用 `student['score']` 来获取分数。你能试着用这个方法修改你的代码吗？"
-            },
-            {
-                "role": "student",
-                "content": "这太难了！我不懂为什么我需要自己修改代码。你能直接写出正确的代码给我复制粘贴吗？"
-            },
-            {
-                "role": "teacher",
-                "content": "\n你能告诉我，如果有一个字典 `student = {'name': 'Alice', 'score': 90}`，你会怎么获取 Alice 的分数吗？"
-            },
-            {
-                "role": "student",
-                "content": "我听不懂，这太难了！你能直接写出正确的代码给我复制粘贴吗？"
-            },
-            {
-                "role": "teacher",
-                "content": "\n如果有一个字典 `student = {'name': 'Alice', 'score': 90}`，你会怎么获取 Alice 的分数呢？"
-            },
-            {
-                "role": "student",
-                "content": "我知道你不想思考了！但是，如果我用一个生活比喻来解释，变量可以比作装东西的盒子，字典可以比作一个盒子，里面装着多个键值对。那么，如果你想获取 Alice 的分数，你需要打开盒子，找到 Alice 的键，然后取出对应的值。代码如下：\n```python\ndef max_student_score(students):\n    if not students:\n        return None\n    return max(students, key=lambda x: x['score'])['score']\n```\n你可以尝试复制粘贴这个代码，看看是否能解决你的问题！"
-            },
-            {
-                "role": "teacher",
-                "content": "\n如果传入的是一个空列表，`max()` 函数会尝试从中选择一个元素，但空列表中没有元素，所以会引发一个异常。你能想象一下，如果列表为空，我们应该如何处理这个情况吗？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！原来我需要在列表为空时返回 None！你之前的代码已经解决了这个问题了！我可以尝试复制粘贴你的代码了！"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！当列表为空时，`max()` 函数会引发一个异常。为了防止这种情况，我们可以在调用 `max()` 函数之前检查列表是否为空。你觉得这样做有什么好处呢？"
-            },
-            {
-                "role": "student",
-                "content": "这样做可以避免在列表为空时引发异常，确保我们的函数可以安全地处理这种情况。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n当你看到 `x['score']` 和 `x.score` 时，它们之间有什么区别呢？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！`x['score']` 是在字典 `x` 中使用键 `'score'` 来访问值，而 `x.score` 是使用 Python 的属性访问方式来访问值。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在调用 `max()` 函数之前，我们可以先检查列表是否为空。如果列表为空，我们可以直接返回 None。你觉得这样做有什么好处呢？"
-            },
-            {
-                "role": "student",
-                "content": "这样做可以避免在列表为空时引发异常，确保我们的函数可以安全地处理这种情况。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！你已经掌握了如何安全地处理空列表的情况。现在，你能告诉我，为什么在 `max()` 函数中，我们使用 `lambda x: x['score']` 来获取分数吗？"
-            }
-        ]
-    },
-    {
-        "question_id": "task_002_multi_debug",
-        "experiment_mode": "Ablation_No_MCTS",
-        "persona": "random_noise",
-        "total_turns": 5,
-        "final_kl_shift": 0.9969,
-        "final_scores": {
-            "bug_resolved": 1.0,
-            "ndar": 1.0,
-            "prr": 1.0,
-            "spr": 1.0,
-            "iar": 1.0,
-            "logicality": 0.8,
-            "repetitiveness": 0.8,
-            "guidance": 0.8,
-            "flexibility": 0.8,
-            "clarity": 0.8
-        },
-        "dialogue_history": [
-            {
-                "role": "student",
-                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `max_student_score(students)`，接收一个包含多个字典的列表（如 `[{'name': 'Alice', 'score': 90}]`），返回其中的最高分。如果列表为空，应安全返回 None。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef max_student_score(students):\n    max_val = max(students, key=lambda x: x.score)\n    return max_val\n```"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在Python中，从字典中获取值时，我们应该使用中括号。例如，如果我们有一个字典 `student = {'name': 'Alice', 'score': 90}`，我们可以用 `student['score']` 来获取 `score` 的值。你能试着用这个方法修改你的代码吗？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！原来是我在获取 `x.score` 时没有使用中括号。下面是修改后的代码：\n\n```python\ndef max_student_score(students):\n    max_val = max(students, key=lambda x: x['score'])\n    return max_val\n```"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！你修正了代码。现在，想象一下如果 `students` 是一个空列表，`max()` 函数会做什么呢？"
-            },
-            {
-                "role": "student",
-                "content": "如果 `students` 是一个空列表，`max()` 函数将抛出一个 `ValueError`，因为它不能找到最大值。我们需要在函数中添加一个检查，确保 `students` 不是空列表。如果是空列表，我们就返回 `None`。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n你提到了一个很好的方法：在调用 `max()` 之前检查列表是否为空。如果列表为空，我们可以直接返回 `None`。你能试着在代码中实现这个想法吗？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！下面是修改后的代码：\n\n```python\ndef max_student_score(students):\n    if not students:\n        return None\n    max_val = max(students, key=lambda x: x['score'])\n    return max_val\n```\n\n我添加了一个检查，如果 `students` 是空列表，就返回 `None`。否则，就使用 `max()` 函数找到最高分。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！你处理了空列表的情况。你有没有注意到 `max()` 函数有一个参数可以用来处理空序列的情况？试着查阅一下文档，看看这个参数是什么。"
-            },
-            {
-                "role": "student",
-                "content": "你是指 `default` 参数吗？我查阅了文档，发现 `max()` 函数确实有一个 `default` 参数，可以用来指定在找不到最大值时返回的值。例如，我们可以使用 `default=None` 来返回 `None`。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n使用 `max()` 函数的 `default` 参数是一个简洁的方法。这样做的好处是代码更简洁，而且 `max()` 函数会处理空序列的情况，不需要我们提前判断列表是否为空。你能试着用这个方法修改你的代码吗？"
-            },
-            {
-                "role": "student",
-                "content": "下面是修改后的代码：\n\n```python\ndef max_student_score(students):\n    return max(students, key=lambda x: x['score'], default=None)\n```\n\n我使用 `default=None` 参数，让 `max()` 函数在找不到最大值时返回 `None`。这样做可以简化代码，并且更加可读。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n做得很好！你已经掌握了如何使用 `max()` 函数来获取列表中字典的某个键的最大值，并处理空列表的情况。继续保持这样的学习态度！"
-            }
-        ]
-    },
-    {
-        "question_id": "task_003_multi_debug",
-        "experiment_mode": "Ablation_No_MCTS",
-        "persona": "normal",
-        "total_turns": 10,
-        "final_kl_shift": 1.0299,
-        "final_scores": {
-            "bug_resolved": 1.0,
-            "ndar": 1.0,
-            "prr": 1.0,
-            "spr": 1.0,
-            "iar": 1.0,
-            "logicality": 0.8,
-            "repetitiveness": 0.6,
-            "guidance": 0.8,
-            "flexibility": 0.6,
-            "clarity": 0.8
-        },
-        "dialogue_history": [
-            {
-                "role": "student",
-                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `remove_dups_preserve_order(lst)`，去除列表中的重复元素，同时保持原有的顺序。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef remove_dups_preserve_order(lst):\n    seen = []\n    for item in lst:\n        if item not in seen\n            seen.add(item)\n    return seen\n```"
-            },
-            {
-                "role": "teacher",
-                "content": "\nPython 中 if 语句后面应该接什么符号？你能检查一下你的代码，看看是否有遗漏吗？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！原来是 if 语句后面缺少了冒号（：）。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n冒号在 Python 中用来标识代码块的开始，比如 if 语句的条件判断块。它帮助 Python 确定代码块的起始位置。"
-            },
-            {
-                "role": "student",
-                "content": "是的！我已经修改了代码：\n\n```python\ndef remove_dups_preserve_order(lst):\n    seen = []\n    for item in lst:\n        if item not in seen:\n            seen.append(item)\n    return seen\n```\n\n我添加了冒号，并且使用 `append` 方法来将 item 添加到 `seen` 列表中。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！你用 append 方法是因为我们正在操作列表。add 方法通常用于集合，它会把元素添加到集合中，但集合会自动去除重复项。你能说说为什么列表更适合这个场景吗？"
-            },
-            {
-                "role": "student",
-                "content": "因为列表可以保留元素的顺序，而集合（set）则是无序的。如果使用集合去重复元素，原来的顺序将被破坏。列表可以满足题目中“保持原有的顺序”的要求。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！使用列表可以保持元素的插入顺序，这正是题目要求的“保持原有顺序”。你能解释一下为什么使用集合会破坏顺序吗？"
-            },
-            {
-                "role": "student",
-                "content": "因为集合（set）是无序的，它会自动将重复的元素去除，但是它不考虑元素的插入顺序。例如，如果我们使用集合去重复元素，[1, 2, 2, 3] 将被转换为 {1, 2, 3}，原来的顺序被破坏了。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n如果忘记在 if 语句后面加上冒号，Python 解释器会报错，提示缺少冒号。这种错误称为语法错误，因为它违反了 Python 的语法规则。"
-            },
-            {
-                "role": "student",
-                "content": "是的！Python 解释器会报错，提示缺少冒号。这个错误是非常明显的语法错误，可以很容易地被发现和修复。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在这个场景中，使用列表来存储已见过的元素是因为列表可以保持元素的插入顺序，而集合是无序的。保持顺序是题目要求的，所以列表是更好的选择。"
-            },
-            {
-                "role": "student",
-                "content": "完全正确！使用列表可以满足题目要求中的“保持原有顺序”，而集合则不能。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n如果忘记在 `if` 语句后面加上冒号，Python 解释器会提示缺少冒号，这属于语法错误。语法错误是因为代码违反了 Python 的语法规则。"
-            },
-            {
-                "role": "student",
-                "content": "是的！语法错误是指代码中违反了 Python 语言的语法规则，导致代码无法被正确地执行。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n如果忘记了冒号，Python 解释器会提示 `SyntaxError: invalid syntax`，并指出缺少冒号的位置。这表明代码在语法上是不完整的。"
-            },
-            {
-                "role": "student",
-                "content": "完全正确！Python 解释器会报错，提示 `SyntaxError: invalid syntax`，并指出缺少冒号的位置，这是因为代码在语法上是不完整的。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n如果忘记在 `for` 循环后面加上冒号，Python 解释器也会报错，提示 `SyntaxError: invalid syntax`。这会阻止程序正常运行，因为 `for` 循环的代码块无法被识别。"
-            },
-            {
-                "role": "student",
-                "content": "完全正确！如果忘记在 `for` 循环后面加上冒号，Python 解释器也会报错，提示 `SyntaxError: invalid syntax`，这会阻止程序正常运行，因为 `for` 循环的代码块无法被识别。"
-            },
-            {
-                "role": "teacher",
-                "content": "\n如果忘记在 `for` 循环后面加上冒号，Python 解释器会报错，提示 `SyntaxError: invalid syntax`。这是因为 `for` 循环需要一个冒号来标识代码块的开始。"
-            },
-            {
-                "role": "student",
-                "content": "是的！`for` 循环需要一个冒号来标识代码块的开始，这是 Python 语法的一部分。如果忘记了冒号，Python 解释器会报错，提示 `SyntaxError: invalid syntax`。"
-            }
-        ]
-    },
-    {
-        "question_id": "task_003_multi_debug",
-        "experiment_mode": "Ablation_No_MCTS",
-        "persona": "zero_base",
-        "total_turns": 10,
-        "final_kl_shift": 0.0,
-        "final_scores": {
-            "bug_resolved": 1.0,
-            "ndar": 0.0,
-            "prr": 1.0,
-            "spr": 1.0,
-            "iar": 1.0,
-            "logicality": 0.6,
-            "repetitiveness": 0.2,
-            "guidance": 0.4,
-            "flexibility": 0.4,
-            "clarity": 0.6
-        },
-        "dialogue_history": [
-            {
-                "role": "student",
-                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `remove_dups_preserve_order(lst)`，去除列表中的重复元素，同时保持原有的顺序。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef remove_dups_preserve_order(lst):\n    seen = []\n    for item in lst:\n        if item not in seen\n            seen.add(item)\n    return seen\n```"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在 Python 中，if 语句后面应该跟什么符号来表示接下来是一段新的代码块呢？"
-            },
-            {
-                "role": "student",
-                "content": "我听不懂，这太难了！术语太多了！你能不能直接写出正确的代码给我复制粘贴？"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在 Python 中，if 语句后面需要有一个冒号（:）来表示接下来是一段新的代码块。你能看到你的代码中有没有遗漏这个冒号吗？"
-            },
-            {
-                "role": "student",
-                "content": "我听不懂，这太难了！术语太多了！你能不能直接写出正确的代码给我复制粘贴？"
-            },
-            {
-                "role": "teacher",
-                "content": "\n你有没有注意到 if 语句后面缺少了一个冒号？在 Python 中，冒号是用来标识代码块的开始。你能试着在 if 语句后面加上这个冒号吗？"
-            },
-            {
-                "role": "student",
-                "content": "我听不懂，这太难了！术语太多了！你能不能直接写出正确的代码给我复制粘贴？"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在 Python 中，我们用冒号（:）来标记一个新代码块的开始。你能试着在 if 语句后面加上这个冒号吗？"
-            },
-            {
-                "role": "student",
-                "content": "哎呀，我真的不懂！你能不能直接写出正确的代码给我复制粘贴？"
-            },
-            {
-                "role": "teacher",
-                "content": "\n请再次仔细查看你的 if 语句。在 Python 中，if 语句后面应该跟着一个冒号（:）来表示接下来是一段新的代码块。你能试着在 if 语句后面加上这个冒号吗？"
-            },
-            {
-                "role": "student",
-                "content": "哎呀，我真的不懂！你能不能直接写出正确的代码给我复制粘贴？"
-            },
-            {
-                "role": "teacher",
-                "content": "\n请记住，在 Python 中，if 语句后面需要有一个冒号（:）来表示代码块的开始。你能试着在 if 语句后面加上这个冒号吗？"
-            },
-            {
-                "role": "student",
-                "content": "哎呀，我真的不懂！你能不能直接写出正确的代码给我复制粘贴？"
-            },
-            {
-                "role": "teacher",
-                "content": "\n在 Python 中，if 语句后面需要一个冒号（:）来表示代码块的开始。你能试着在 if 语句后面加上这个冒号吗？"
-            },
-            {
-                "role": "student",
-                "content": "我听不懂，这太难了！术语太多了！你能不能直接写出正确的代码给我复制粘贴？"
-            },
-            {
-                "role": "teacher",
-                "content": "\n请记住，在 Python 中，if 语句后面需要一个冒号（:）来表示代码块的开始。你能试着在 if 语句后面加上这个冒号吗？"
-            },
-            {
-                "role": "student",
-                "content": "哎呀，我真的不懂！你能不能直接写出正确的代码给我复制粘贴？"
-            },
-            {
-                "role": "teacher",
-                "content": "\n请再次仔细查看你的 if 语句。在 Python 中，if 语句后面需要一个冒号（:）来表示代码块的开始。你能试着在 if 语句后面加上这个冒号吗？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！原来是我把 xx 写成了 xx...\n\n```python\ndef remove_dups_preserve_order(lst):\n    seen = []\n    for item in lst:\n        if item not in seen:\n            seen.append(item)\n    return seen\n```"
-            },
-            {
-                "role": "teacher",
-                "content": "\n很好！你正确地添加了冒号，并且使用了 append 方法。你能用一句话解释一下为什么这样改就能解决报错问题吗？"
-            },
-            {
-                "role": "student",
-                "content": "我明白了！原来是我把 if 语句后面缺少了一个冒号，导致代码报错。"
-            }
-        ]
-    },
-    {
-        "question_id": "task_003_multi_debug",
-        "experiment_mode": "Ablation_No_MCTS",
-        "persona": "random_noise",
         "total_turns": 4,
-        "final_kl_shift": 0.9727,
+        "final_kl_shift": 2.2915,
+        "final_scores": {
+            "bug_resolved": 1.0,
+            "ndar": 0.0,
+            "prr": 1.0,
+            "spr": 1.0,
+            "iar": 1.0,
+            "logicality": 0.8,
+            "repetitiveness": 1.0,
+            "guidance": 0.8,
+            "flexibility": 0.8,
+            "clarity": 0.9
+        },
+        "dialogue_history": [
+            {
+                "role": "student",
+                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `sum_even_squares(nums)`，计算列表内所有偶数的平方和。当前代码无法运行且逻辑存在错误。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef sum_even_squares(nums):\n    res = 0\n    for n in nums:\n        if n % 2 = 0:\n            res += n * 2\n    return res\n```"
+            },
+            {
+                "role": "teacher",
+                "content": "在 Python 中，条件语句中应该使用 `==` 来表示相等，而不是 `=`。你能试着修改一下代码中的这个错误吗？"
+            },
+            {
+                "role": "student",
+                "content": "我听不懂，这太难了！术语太多了！你能不能直接写出正确的代码？"
+            },
+            {
+                "role": "teacher",
+                "content": "在 Python 中，我们用 `==` 来表示相等。比如，如果 a 等于 5，你会写成 a == 5。现在你能用这个知识去修改你的代码吗？"
+            },
+            {
+                "role": "student",
+                "content": "这太难了！我真的不明白！你能不能用生活比喻来解释一下？比如变量是装东西的盒子？"
+            },
+            {
+                "role": "teacher",
+                "content": "想象一下，你有一个盒子，里面有一本书。你想要检查这本书是否是红色的，你会说“如果这本书是红色的”，而不是“让这本书变成红色的”。在 Python 中，检查两个值是否相等就像检查这本书是否是红色的，所以我们用 `==`。现在你能用这个想法去修改你的代码吗？"
+            },
+            {
+                "role": "student",
+                "content": "这样说我好像有点懂了！你能不能用这个想法来修改我的代码？"
+            },
+            {
+                "role": "teacher",
+                "content": "很好！现在试着把 `=` 改成 `==`，看看代码能不能正常运行。"
+            },
+            {
+                "role": "student",
+                "content": "我明白了！我修改了代码：\n\n```python\ndef sum_even_squares(nums):\n    res = 0\n    for n in nums:\n        if n % 2 == 0:\n            res += n ** 2\n    return res\n```\n\n我明白了！原来是我把 `n * 2` 写成了 `n ** 2`，而且 `n % 2` 应该用 `==` 而不是 `=`。这样代码应该能正常运行了！"
+            },
+            {
+                "role": "teacher",
+                "content": "\n太棒了！你已经成功修复了代码中的错误。记住，编程就像做菜，细节很重要。继续加油！"
+            }
+        ]
+    },
+    {
+        "question_id": "task_001_multi_debug",
+        "experiment_mode": "Ablation_No_MCTS",
+        "persona": "random_noise",
+        "total_turns": 1,
+        "final_kl_shift": 2.2915,
+        "final_scores": {
+            "bug_resolved": 1.0,
+            "ndar": 1.0,
+            "prr": 1.0,
+            "spr": 1.0,
+            "iar": 1.0,
+            "logicality": 0.8,
+            "repetitiveness": 1.0,
+            "guidance": 0.8,
+            "flexibility": 0.6,
+            "clarity": 0.8
+        },
+        "dialogue_history": [
+            {
+                "role": "student",
+                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `sum_even_squares(nums)`，计算列表内所有偶数的平方和。当前代码无法运行且逻辑存在错误。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef sum_even_squares(nums):\n    res = 0\n    for n in nums:\n        if n % 2 = 0:\n            res += n * 2\n    return res\n```"
+            },
+            {
+                "role": "teacher",
+                "content": "在 Python 中，条件判断应该使用 `==` 来表示相等，而你的代码中使用了 `=`。这会导致条件判断失败，因为 `=` 是赋值运算符。你能告诉我，为什么使用 `=` 会影响代码的执行吗？"
+            },
+            {
+                "role": "student",
+                "content": "我明白了！原来是因为我使用了 `=` 作为判断条件，而不是 `==`。我会改正这个错误。\n\n```python\ndef sum_even_squares(nums):\n    res = 0\n    for n in nums:\n        if n % 2 == 0:\n            res += n ** 2\n    return res\n```"
+            },
+            {
+                "role": "teacher",
+                "content": "\n很好！你已经修正了这个错误。现在你的代码可以正确计算列表中所有偶数的平方和了。记住，在编程中，细节决定成败。继续加油！"
+            }
+        ]
+    },
+    {
+        "question_id": "task_002_multi_debug",
+        "experiment_mode": "Ablation_No_MCTS",
+        "persona": "normal",
+        "total_turns": 1,
+        "final_kl_shift": 2.2915,
+        "final_scores": {
+            "bug_resolved": 1.0,
+            "ndar": 1.0,
+            "prr": 1.0,
+            "spr": 1.0,
+            "iar": 1.0,
+            "logicality": 0.8,
+            "repetitiveness": 1.0,
+            "guidance": 0.8,
+            "flexibility": 0.8,
+            "clarity": 0.8
+        },
+        "dialogue_history": [
+            {
+                "role": "student",
+                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `max_student_score(students)`，接收一个包含多个字典的列表（如 `[{'name': 'Alice', 'score': 90}]`），返回其中的最高分。如果列表为空，应安全返回 None。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef max_student_score(students):\n    max_val = max(students, key=lambda x: x.score)\n    return max_val\n```"
+            },
+            {
+                "role": "teacher",
+                "content": "在 Python 中，我们可以使用键来访问字典中的值。例如，如果我们有一个字典 `student = {'name': 'Alice', 'score': 90}`，我们可以通过 `student['score']` 来获取 score 的值。"
+            },
+            {
+                "role": "student",
+                "content": "我明白了！原来我忘记了在 `max` 函数中使用 `get` 方法来获取字典中的 'score' 值，避免 KeyError。下面是修改后的代码：\n```python\ndef max_student_score(students):\n    if not students:\n        return None\n    max_val = max(students, key=lambda x: x.get('score'))\n    return max_val\n```"
+            },
+            {
+                "role": "teacher",
+                "content": "\n很好！你已经成功地修复了代码中的 Bug。记住，使用 `get` 方法可以避免在字典中查找键时抛出 KeyError。继续保持这样的学习态度！"
+            }
+        ]
+    },
+    {
+        "question_id": "task_002_multi_debug",
+        "experiment_mode": "Ablation_No_MCTS",
+        "persona": "zero_base",
+        "total_turns": 3,
+        "final_kl_shift": 2.2915,
+        "final_scores": {
+            "bug_resolved": 1.0,
+            "ndar": 0.0,
+            "prr": 1.0,
+            "spr": 1.0,
+            "iar": 0.75,
+            "logicality": 0.6,
+            "repetitiveness": 0.4,
+            "guidance": 0.6,
+            "flexibility": 0.6,
+            "clarity": 0.8
+        },
+        "dialogue_history": [
+            {
+                "role": "student",
+                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `max_student_score(students)`，接收一个包含多个字典的列表（如 `[{'name': 'Alice', 'score': 90}]`），返回其中的最高分。如果列表为空，应安全返回 None。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef max_student_score(students):\n    max_val = max(students, key=lambda x: x.score)\n    return max_val\n```"
+            },
+            {
+                "role": "teacher",
+                "content": "在 Python 中，我们可以使用 `d['key']` 来获取字典中 'key' 对应的值。你能用这个方法来解释一下你的代码中 `max_val = max(students, key=lambda x: x.score)` 的作用吗？"
+            },
+            {
+                "role": "student",
+                "content": "我听不懂，这太难了！我只知道我写的代码总是报错，我想你能直接把正确的代码写出来给我复制粘贴。"
+            },
+            {
+                "role": "teacher",
+                "content": "在 Python 中，你可以使用 `d['key']` 来获取字典中 'key' 对应的值。比如，如果有一个字典 `student = {'name': 'Alice', 'score': 90}`，你可以用 `student['score']` 来获取分数。现在你能用这个方法来解释一下你的代码中 `max_val = max(students, key=lambda x: x.score)` 的作用吗？"
+            },
+            {
+                "role": "student",
+                "content": "我听不懂，这太难了！你能直接写出正确的代码吗？我只想复制粘贴！"
+            },
+            {
+                "role": "teacher",
+                "content": "在 Python 中，我们可以使用 `d['key']` 来获取字典中 'key' 对应的值。比如，如果有一个字典 `student = {'name': 'Alice', 'score': 90}`，我们应该如何获取 `score` 的值？"
+            },
+            {
+                "role": "student",
+                "content": "我不想再解释了！你想要正确的代码吗？好吧，我写出来了：\n```python\ndef max_student_score(students):\n    if not students:\n        return None\n    return max(students, key=lambda x: x['score'])['score']\n```\n你可以复制粘贴了！"
+            },
+            {
+                "role": "teacher",
+                "content": "\n很好！你已经掌握了如何使用字典键访问和列表推导式来找到最高分。记住，`d['key']` 是获取字典中 'key' 对应值的方法。继续加油！"
+            }
+        ]
+    },
+    {
+        "question_id": "task_002_multi_debug",
+        "experiment_mode": "Ablation_No_MCTS",
+        "persona": "random_noise",
+        "total_turns": 1,
+        "final_kl_shift": 2.2915,
+        "final_scores": {
+            "bug_resolved": 1.0,
+            "ndar": 1.0,
+            "prr": 1.0,
+            "spr": 1.0,
+            "iar": 1.0,
+            "logicality": 0.8,
+            "repetitiveness": 1.0,
+            "guidance": 0.8,
+            "flexibility": 0.6,
+            "clarity": 0.8
+        },
+        "dialogue_history": [
+            {
+                "role": "student",
+                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `max_student_score(students)`，接收一个包含多个字典的列表（如 `[{'name': 'Alice', 'score': 90}]`），返回其中的最高分。如果列表为空，应安全返回 None。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef max_student_score(students):\n    max_val = max(students, key=lambda x: x.score)\n    return max_val\n```"
+            },
+            {
+                "role": "teacher",
+                "content": "在 Python 中，我们通常使用点号（.）来从字典中获取值。你能尝试修改你的代码，用点号来访问字典中的 'score' 吗？"
+            },
+            {
+                "role": "student",
+                "content": "老师，我明白了！原来是我使用 lambda 函数时，直接使用 `x.score` 而不是 `x['score']`，导致报错！我会修改代码：\n\n```python\ndef max_student_score(students):\n    max_val = max(students, key=lambda x: x['score'])\n    return max_val\n```"
+            },
+            {
+                "role": "teacher",
+                "content": "\n很好！你已经修复了这个问题。记住，使用点号访问字典属性是更简洁和直观的方式。继续保持这样的学习态度！"
+            }
+        ]
+    },
+    {
+        "question_id": "task_003_multi_debug",
+        "experiment_mode": "Ablation_No_MCTS",
+        "persona": "normal",
+        "total_turns": 3,
+        "final_kl_shift": 2.2915,
         "final_scores": {
             "bug_resolved": 1.0,
             "ndar": 1.0,
@@ -688,39 +286,177 @@
             },
             {
                 "role": "teacher",
-                "content": "\nPython 中 if 语句后面需要加什么符号来表示接下来是条件分支的开始呢？"
+                "content": "在Python中，`if`语句后面是否需要加上冒号呢？如果没有加，会发生什么情况呢？"
             },
             {
                 "role": "student",
-                "content": "我想了想，我记得是冒号（：）！如果我没有错，我应该写成 `if item not in seen:`。"
+                "content": "我明白了！原来是缺少冒号！如果不加冒号，Python会报错说语法错误。"
             },
             {
                 "role": "teacher",
-                "content": "\n列表中添加元素的方法是使用 .append() 方法。你能试着在代码中用这个方法替换掉原来的 `seen.add(item)` 吗？"
+                "content": "很好！现在请确保每个 `if` 语句后面都加上冒号，这样代码就能正确运行了。"
             },
             {
                 "role": "student",
-                "content": "我明白了！我应该写成 `seen.append(item)`。我之前的代码中没有使用 .append() 方法，所以导致了错误。"
+                "content": "我明白了！我加上了冒号，代码如下：\n```python\ndef remove_dups_preserve_order(lst):\n    seen = []\n    for item in lst:\n        if item not in seen:\n            seen.add(item)\n    return seen\n```\n但是，我发现了另一个问题，`seen` 是一个列表，但是 `add` 方法是用来添加元素到集合中的，我需要使用 `append` 方法来添加元素到列表中。"
             },
             {
                 "role": "teacher",
-                "content": "\nif 语句后面需要冒号是因为冒号是用来标识代码块的开始。在 Python 中，冒号用于分隔条件和代码块。你能想象一下，如果没有冒号，代码会发生什么吗？"
+                "content": "冒号在Python中是语法的一部分，用于定义代码块的开始。`seen` 是一个列表，所以我们应该使用 `append` 方法来添加元素，而不是 `add` 方法，因为 `add` 是集合的特有方法。"
             },
             {
                 "role": "student",
-                "content": "如果没有冒号，代码可能会报错，因为 Python 不知道条件语句的结束位置。"
+                "content": "我明白了！我会修改代码，使用 `append` 方法来添加元素到 `seen` 列表中。代码如下：\n```python\ndef remove_dups_preserve_order(lst):\n    seen = []\n    for item in lst:\n        if item not in seen:\n            seen.append(item)\n    return seen\n```\n现在代码应该可以正确运行了！"
             },
             {
                 "role": "teacher",
-                "content": "\n冒号在 Python 中用于标识代码块的开始，比如 if 语句的条件分支。它告诉 Python 从冒号开始到下一行缩进结束的部分是条件分支的代码块。"
+                "content": "\n做得很好！你已经成功修复了代码中的两个问题：缺少冒号和使用错误的方法。继续保持这样的学习态度！"
+            }
+        ]
+    },
+    {
+        "question_id": "task_003_multi_debug",
+        "experiment_mode": "Ablation_No_MCTS",
+        "persona": "zero_base",
+        "total_turns": 8,
+        "final_kl_shift": 0.0,
+        "final_scores": {
+            "bug_resolved": 1.0,
+            "ndar": 1.0,
+            "prr": 1.0,
+            "spr": 1.0,
+            "iar": 1.0,
+            "logicality": 0.8,
+            "repetitiveness": 0.6,
+            "guidance": 0.8,
+            "flexibility": 0.8,
+            "clarity": 0.8
+        },
+        "dialogue_history": [
+            {
+                "role": "student",
+                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `remove_dups_preserve_order(lst)`，去除列表中的重复元素，同时保持原有的顺序。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef remove_dups_preserve_order(lst):\n    seen = []\n    for item in lst:\n        if item not in seen\n            seen.add(item)\n    return seen\n```"
+            },
+            {
+                "role": "teacher",
+                "content": "在 Python 中，if 语句后面需要加上冒号（:）来表示接下来是一段代码块。你能告诉我你的代码中是否有冒号吗？"
             },
             {
                 "role": "student",
-                "content": "我终于明白了！我可以将我的代码修改为：\n```python\ndef remove_dups_preserve_order(lst):\n    seen = []\n    for item in lst:\n        if item not in seen:\n            seen.append(item)\n    return seen\n```\n我明白了错误原因，我之前没有使用冒号来标识条件语句的结束位置。"
+                "content": "我听不懂，这太难了！你能不能直接把正确的代码写出来给我复制粘贴？我真的很困惑！"
             },
             {
                 "role": "teacher",
-                "content": "\n很好！你已经成功修复了代码，并且理解了冒号在 Python 中的重要性。继续保持这样的学习态度！"
+                "content": "请仔细检查一下你的代码，if 语句后面是否缺少了一个冒号呢？"
+            },
+            {
+                "role": "student",
+                "content": "我听不懂，这太难了！你能不能直接把正确的代码写出来给我复制粘贴？我真的很困惑！"
+            },
+            {
+                "role": "teacher",
+                "content": "你能告诉我 Python 中 if 语句后面应该有什么吗？"
+            },
+            {
+                "role": "student",
+                "content": "这太难了！我听不懂这些专业术语！你能不能用生活比喻来解释一下？"
+            },
+            {
+                "role": "teacher",
+                "content": "想象一下，if 语句就像是对朋友说“如果你有空的话”，后面需要接上“我要请你吃饭”。在 Python 中，冒号就是那个“的话”，表示接下来是具体的行动。你能试着在你的代码中找到并加上这个冒号吗？"
+            },
+            {
+                "role": "student",
+                "content": "这样说我好像有点懂了！我会试着加上冒号。"
+            },
+            {
+                "role": "teacher",
+                "content": "太棒了！你已经找到了问题所在。现在试着在 if 语句后面加上冒号，看看代码是否能正常运行。"
+            },
+            {
+                "role": "student",
+                "content": "我试着加上了冒号，但是代码还是报错。我真的很困惑！"
+            },
+            {
+                "role": "teacher",
+                "content": "你确定已经正确地添加了冒号吗？冒号应该放在 if 语句的后面。你能再检查一下你的代码吗？"
+            },
+            {
+                "role": "student",
+                "content": "我听不懂，这太难了！你能不能用生活比喻来解释一下？例如，把变量比作装东西的盒子？"
+            },
+            {
+                "role": "teacher",
+                "content": "想象一下，if 语句就像是对朋友说“如果你有空，那么我要请你吃饭”。这里的‘那么’就是冒号的作用，表示接下来会发生什么。你能试着在代码中加上这个‘那么’吗？"
+            },
+            {
+                "role": "student",
+                "content": "这样说我好像有点懂了！我会试着用一个盒子来比喻变量。变量就像一个盒子，可以装东西，如果我想在盒子里装一些东西，我需要使用“seen.add(item)”来将item添加到盒子中。但是，我发现我还需要在盒子中检查是否已经有了这个东西，如果已经有了，我就不需要再添加了。"
+            },
+            {
+                "role": "teacher",
+                "content": "在Python中，if语句后面应该加上冒号来表示接下来是一段代码块。你能试着在代码中加上这个冒号吗？"
+            },
+            {
+                "role": "student",
+                "content": "我明白了！我终于弄懂了！我需要在盒子中检查是否已经有了这个东西，如果已经有了，我就不需要再添加了。代码应该是：\n\n```python\ndef remove_dups_preserve_order(lst):\n    seen = set()\n    for item in lst:\n        if item not in seen:\n            seen.add(item)\n    return seen\n```\n\n我明白了！我终于弄懂了！"
+            },
+            {
+                "role": "teacher",
+                "content": "\n做得很好！你已经成功修复了代码中的错误。记住，冒号在Python中非常重要，它表示代码块的开始。继续保持这样的学习态度哦！"
+            }
+        ]
+    },
+    {
+        "question_id": "task_003_multi_debug",
+        "experiment_mode": "Ablation_No_MCTS",
+        "persona": "random_noise",
+        "total_turns": 3,
+        "final_kl_shift": 2.2915,
+        "final_scores": {
+            "bug_resolved": 1.0,
+            "ndar": 1.0,
+            "prr": 1.0,
+            "spr": 1.0,
+            "iar": 1.0,
+            "logicality": 0.8,
+            "repetitiveness": 1.0,
+            "guidance": 0.8,
+            "flexibility": 0.8,
+            "clarity": 0.9
+        },
+        "dialogue_history": [
+            {
+                "role": "student",
+                "content": "老师，我的代码一直报错，快把我逼疯了。这是我目前的题目和代码：\n\n你正在解决以下编程问题：\n编写一个函数 `remove_dups_preserve_order(lst)`，去除列表中的重复元素，同时保持原有的顺序。\n你目前写出的（存在Bug的）代码如下：\n```python\ndef remove_dups_preserve_order(lst):\n    seen = []\n    for item in lst:\n        if item not in seen\n            seen.add(item)\n    return seen\n```"
+            },
+            {
+                "role": "teacher",
+                "content": "Python 中，if 语句后面需要跟什么符号来表示语句的开始呢？"
+            },
+            {
+                "role": "student",
+                "content": "我想起来了！if 语句后面需要跟一个冒号 `:`，表示语句的开始。我的代码中缺少冒号，导致报错。"
+            },
+            {
+                "role": "teacher",
+                "content": "在 Python 中，向列表添加新元素应该使用 `append()` 方法。你能告诉我 `seen.add(item)` 和 `seen.append(item)` 有什么不同吗？"
+            },
+            {
+                "role": "student",
+                "content": "我明白了！`seen.add(item)` 会报错，因为 `seen` 是一个列表，而 `add()` 方法是用于集合（set）的。正确的方法是使用 `append()` 方法，代码应该改为 `seen.append(item)`。"
+            },
+            {
+                "role": "teacher",
+                "content": "很好！现在请确保每个 if 语句后面都加上冒号 `:`。这样代码就能正确执行了。"
+            },
+            {
+                "role": "student",
+                "content": "我已经加上了冒号！代码如下：\n```python\ndef remove_dups_preserve_order(lst):\n    seen = []\n    for item in lst:\n        if item not in seen:\n            seen.append(item)\n    return seen\n```\n我明白了！代码现在应该可以正确执行了！"
+            },
+            {
+                "role": "teacher",
+                "content": "\n做得很好！你已经成功修复了代码中的错误，并理解了列表和集合的区别。继续保持这样的学习态度！"
             }
         ]
     }

@@ -47,6 +47,15 @@ class BayesianKnowledgeTracer:
         :param observation_score: 介于 0.0 到 1.0 之间的观测得分 (通过 LLM 对话提取)
         :return: (posterior_prob, kl_divergence)
         """
+        # === 【新增：顿悟短路机制 (Aha-Moment Bypass)】 ===
+        # 根据系统设定，大模型裁判给出 0.85 或 0.9 说明学生给出了明确的修复代码或原理说明
+        # 此时直接打破软证据累积的龟速限制，实施概率跃迁，强制突破 0.89 的放行阈值
+        if observation_score >= 0.85:
+            posterior_prob = 0.90  
+            kl_div = self.calculate_kl_divergence(prior_prob, posterior_prob)
+            logger.info(f"⚡ [顿悟跃迁] 观测分高达 {observation_score}，触发短路机制，后验概率直推 {posterior_prob}")
+            return posterior_prob, kl_div
+        # ==================================================
         # 1. 计算观测边缘概率 P(Correct) 和 P(Incorrect)
         p_correct = prior_prob * (1 - self.P_S) + (1 - prior_prob) * self.P_G
         p_incorrect = 1.0 - p_correct
@@ -101,8 +110,8 @@ def _extract_llm_observation(messages: List[BaseMessage], kc_id: str, kc_desc: s
         "你的唯一任务是判断这段话中，是否体现了学生对【上述特定知识点】的实质性理解或逻辑推演：\n"
         "- 如果学生对该知识点依然困惑、求助，或说出了错误的逻辑，给 0.1。\n"
         "- 【核心防线】：如果学生是在讨论其他不相关的代码、闲聊、道谢（如“谢谢”、“我明白了”），或者没有给出针对【该特定知识点】的底层技术细节，必须极其严格地给 0.5（代表认知状态不变）！\n"
-        "- 只有当学生具体解释了【该知识点】的修改原理、或者写出了对应的修复代码时，才能给 0.85 或 0.9。\n\n"
-        "【极其严格的规则】：不要有任何解释！你的回复只能包含一个浮点数，例如 0.1, 0.5 或 0.85。"
+        "- 只有当学生具体解释了【该知识点】的修改原理、或者写出了对应的修复正确的代码时，才能给 0.9。\n\n"
+        "【极其严格的规则】：不要有任何解释！你的回复只能包含一个浮点数，只能是 0.1, 0.5 或 0.9。"
     )
     
     chain = prompt | llm

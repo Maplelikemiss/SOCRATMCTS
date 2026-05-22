@@ -1,9 +1,12 @@
 # [重构] 拆分自原 instructor.py，负责接收 Consultant 策略并转化为自然语言教学
 import logging
+import re
 from typing import Dict, Any
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+from state.graph_state import GraphState
 
 # 引用全局状态定义
 from state.graph_state import GraphState
@@ -37,7 +40,7 @@ class TeacherAgent:
            - ❌ 错误示范（泄题）：“你应该把 len(nums) + 1 改成 len(nums)。”
            - ✅ 正确示范（启发）：“如果列表长度是3，你的循环上限会变成几呢？这个数字超出了列表的最大索引吗？”
         3. 启发为主：抛出问题，让学生自己去填补逻辑空白。
-        4. 语气亲和：多用鼓励性的语言（如“你观察得很仔细”），减轻学生的认知焦虑。
+        4. 【防角色错乱】：你必须永远保持第一人称“我”的导师口吻！绝对禁止说出“好的，老师”或“如果我是老师”。
         5. 【核心新增：单一焦点原则】：
            在一个多漏洞场景中，你收到的 `focus_kc_id` 是当前唯一合法的教学目标。
            即便你发现学生的代码中还存在其他明显的 Bug，只要它们不属于当前聚焦的知识点，你必须假装没看见！
@@ -65,53 +68,90 @@ class TeacherAgent:
                 "internal_reasoning": "状态缺失兜底",
                 "tactical_draft": "温和地询问学生目前对这段代码逻辑的具体困惑在哪里。"
             }
-            
-        # 2. 组装下发给 LLM 的指令
+
+        # ==========================================
+        # 【防御一】：严格的上下文清洗与截断 (防洗脑)
+        # ==========================================
+        raw_messages = state.get("messages", [])
+        clean_messages = []
+        for msg in raw_messages:
+            # 过滤掉系统内部可能混入的调试信息，仅保留师生真实对话
+            if isinstance(msg, (HumanMessage, AIMessage)) and msg.content.strip():
+                clean_messages.append(msg)
+                
+        # 强制截断历史：仅保留最近的 6 条（3轮交互），防止大模型被极度抗拒的学生“同化”语气
+        if len(clean_messages) > 6:
+            clean_messages = clean_messages[-6:]
+
+        # ==========================================
+        # 【防御二】：组装指令与末端身份锚点 (Recency Bias)
+        # ==========================================
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
             ("user", "【顾问(Consultant) 下发的内部指令】\n"
                      "核心动作类型: {strategy_type}\n"
                      "关注的知识点: {focus_kc_id}\n"
-                     "顾问推演逻辑: {reasoning}\n"
                      "====================\n"
                      "【你的执行草案 (必须遵守)】\n"
                      "{tactical_draft}\n"
-                     "【执行特别提醒】：\n"
-                     "请只针对指定的知识点进行引导，不要提及代码中的任何其他错误。请立即直接输出你要对学生说的话。")
+                     "请只针对指定的知识点进行引导，不要提及代码中的任何其他错误。请立即直接输出你要对学生说的话。"),
+            # 【末端锚点】：利用注意力机制的近因效应，在生成 Token 前最后一刻强行锁死第一人称！
+            ("system", "🚨【最后警告】：你是导师！绝对禁止在回复中包含“好的，老师”、“谢谢老师”、“如果我是老师”等言论。保持第一人称“我”，直接输出引导，不要解释！")
         ])
         
         chain = prompt | self.llm
         
-        try:
-            # 3. 触发 LLM 生成回复
-            response_msg = chain.invoke({
-                "chat_history": state.get("messages", []),
-                "strategy_type": strategy.get("strategy_type"),
-                "focus_kc_id": strategy.get("focus_kc_id"),
-                "reasoning": strategy.get("internal_reasoning"),
-                "tactical_draft": strategy.get("tactical_draft")
-            })
-            
-            mode = state.get("experiment_mode", "Socrat_Full")
-            content = response_msg.content
-            
-            # 仅在需要展示策略本身纯度时关闭正则，或者专门为基线关闭
-            if strategy.get("strategy_type") != "Direct_Correction":
-                if "```" in content:
-                    if mode in ["TreeInstruct_Baseline", "Ablation_No_MCTS", "Ablation_No_LLMKT"]:
-                        # 基线和消融变体不穿防弹衣，直接暴露！
-                        logger.warning(f"🚨 {mode} 触发红线：Teacher 输出了代码块，作为对比基线，不予拦截！")
-                    else:
-                        # 只有完整框架才可能保留这个兜底，或者为了证明 SocratMCTS 本身就很强，你甚至可以全面移除这段正则！
-                        logger.warning("🚨 触发红线：执行正则抹除！")
-                        content = re.sub(r'```[a-zA-Z]*\n.*?```', '\n*(老师原本想...)*\n', content, flags=re.DOTALL)
-                        
-            return content
-            
-        except Exception as e:
-            logger.error(f"Teacher 文本生成失败: {e}")
-            return "我明白你的困惑了。咱们一步步来，你能先跟我说说你是怎么理解当前这段代码的逻辑的吗？"
+        # ==========================================
+        # 【防御三】：黑名单巡检与硬性熔断 (Output Interception)
+        # ==========================================
+        max_retries = 2
+        final_content = ""
+        forbidden_phrases = ["好的，老师", "好的老师", "谢谢老师", "如果我是老师", "假设我是老师", "同学你好"]
+        has_role_confusion = False
+
+        for attempt in range(max_retries):
+            try:
+                response_msg = chain.invoke({
+                    "chat_history": clean_messages, # 使用清洗截断后的消息
+                    "strategy_type": strategy.get("strategy_type"),
+                    "focus_kc_id": strategy.get("focus_kc_id"),
+                    "tactical_draft": strategy.get("tactical_draft")
+                })
+                
+                content = response_msg.content.strip()
+                
+                # 巡检是否包含违禁角色错乱词
+                has_role_confusion = any(phrase in content for phrase in forbidden_phrases)
+                
+                if not has_role_confusion:
+                    final_content = content
+                    break
+                else:
+                    logger.warning(f"⚠️ 触发角色倒错拦截！模型输出包含违禁词。正在重试 ({attempt+1}/{max_retries})... 违规内容: {content}")
+                    
+            except Exception as e:
+                logger.error(f"Teacher 文本生成失败: {e}")
+                break
+                
+        # 兜底降级策略：如果重试两次依然错乱，强行切断废话，强制路由回正轨
+        if not final_content or has_role_confusion:
+            logger.error("🛑 角色倒错重试超限，触发兜底降级回复。")
+            final_content = "让我们先冷静一下，回到刚才的代码本身。你能再仔细看看目前讨论的这一行逻辑吗？"
+
+        # ==========================================
+        # 原始防御：防泄题 (NDAR 正则抹除) 保持不变
+        # ==========================================
+        mode = state.get("experiment_mode", "Socrat_Full")
+        if strategy.get("strategy_type") != "Direct_Correction":
+            if "```" in final_content:
+                if mode in ["TreeInstruct_Baseline", "Ablation_No_MCTS", "Ablation_No_LLMKT"]:
+                    logger.warning(f"🚨 {mode} 触发红线：Teacher 输出了代码块，作为对比基线，不予拦截！")
+                else:
+                    logger.warning("🚨 触发红线：执行正则抹除！")
+                    final_content = re.sub(r'```[a-zA-Z]*\n.*?```', '\n*(老师原本想给出代码，但为了你的学习，请你自己尝试写出这部分...)*\n', final_content, flags=re.DOTALL)
+                    
+        return final_content
 
 # ==========================================
 # 接入 LangGraph 的 Node 执行函数
@@ -132,7 +172,6 @@ def teacher_node_step(state: GraphState) -> Dict[str, Any]:
     logger.debug(f"Teacher 回复: {response_text}")
     
     # LangGraph 中对 messages 字段使用的是 add_messages (append 模式)
-    # 所以我们只需返回增量的列表，图状态会自动拼接
     return {
         "messages": [ai_message]
     }

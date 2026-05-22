@@ -147,6 +147,11 @@ def should_continue_teaching(state: GraphState) -> str:
     # 【锁定胜局】：只要曾经写对过，就永远是 1.0
     effective_bug_resolved = max(all_bug_scores) if all_bug_scores else 0.0
 
+    # === 【新增：修复后容忍度计数器】 ===
+    # 统计“代码达到完美或接近完美”的状态已经持续了多少轮
+    resolved_turns_count = sum(1 for score in all_bug_scores if score >= 0.85)
+    # ==================================
+
     # 2. 评估认知底盘 (KC 掌握度)
     student_kcs = state.get("student_kcs", {})
     lowest_prob = 1.0
@@ -199,8 +204,16 @@ def should_continue_teaching(state: GraphState) -> str:
     if effective_bug_resolved >= 0.85 and kc_threshold_met:
         logger.info(f"🎉 双重达标：代码已修好且概念已内化 (超越 {target_threshold} 阈值)，进入总结反思。")
         return "summary_node"
+        
+    # === 【新增：终止条件 C (防死锁放行)】 ===
+    # 如果代码已经修好，并且我们已经给了学生 2 轮的时间去解释，他还是解释不明白（发表情包/废话）
+    # 强制打断过度验证的施法，进入总结节点！
+    if resolved_turns_count >= 2:
+        logger.warning(f"⚠️ [防死锁放行] 代码已完美运行达 {resolved_turns_count} 轮，但部分知识点依然卡壳。强制切断过度验证，准许结案！")
+        return "summary_node"
+    # =======================================
     
-    # 异常拦截：非理解性修复 (代码修好了，但现在还没聊透)
+    # 异常拦截：非理解性修复 (代码修好了，但现在还没聊透，且尚未超时)
     if effective_bug_resolved >= 0.85 and not kc_threshold_met:
         logger.warning("⚠️ 侦测到非理解性修复。Bug 已在历史中解决，但 KC 未达标，回流 Consultant 追问底层逻辑。")
         return "consultant_node"
