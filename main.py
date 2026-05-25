@@ -8,7 +8,7 @@ import argparse
 from typing import List, Dict, Any
 
 # 1. 导入 LangGraph 状态机编排应用
-# 注意：如果你的 langgraph_app.py 中函数名是 create_socrat_graph，请在此处修改或保持对齐
+
 from langgraph_app import build_socrat_mcts_graph
 
 # 2. 导入数据工具与指标计算模块
@@ -199,7 +199,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, default="SocratDataset_Multi_KC.json", help="数据集 JSON 文件路径")
     # 【修改点】改为接收 output_dir，而不是具体的文件名
     parser.add_argument("--output_dir", type=str, default="evaluation_results", help="结果输出目录")
-    parser.add_argument("--sample_size", type=int, default=3, help="限制测试样本量 (-1 表示全量测试)")
+    parser.add_argument("--sample_size", type=int, default=-1, help="限制测试样本量 (-1 表示全量测试)")
     
     # 【新增点】添加 mode 选项控制实验变量
     parser.add_argument(
