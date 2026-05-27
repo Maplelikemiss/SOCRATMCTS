@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
 # ==========================================
-# 1. Global Settings (Removed Chinese fonts, using default default)
+# 1. 全局样式设置
 # ==========================================
 plt.style.use('ggplot')
 
@@ -19,20 +19,19 @@ FILES = [
     "Socrat_Full_results.json"
 ]
 
-RADAR_METRICS = ["bug_resolved", "ndar", "logicality", "repetitiveness", "guidance", "clarity"]
-# Translated Metric Labels
-METRIC_LABELS = ["Bug Resolved", "NDAR", "Logicality", "Repetitiveness", "Guidance", "Clarity"]
+# 去掉了 "(生死红线)" 的中文标注，保持纯英文
+RADAR_METRICS = ["ndar", "bug_resolved", "logicality", "repetitiveness", "guidance", "clarity"]
+METRIC_LABELS = ["NDAR", "Bug Resolved", "Logicality", "Repetitiveness", "Guidance", "Clarity"]
 
-# Translated Mode Labels
+# 配置雷达图各模型线条样式
 MODES_CONFIG = {
-    "Vanilla_Prompting": {"label": "Vanilla (Baseline)", "color": "#9E9E9E", "ls": "--", "alpha": 0.3},
-    "TreeInstruct_Baseline": {"label": "TreeInstruct", "color": "#2196F3", "ls": "-.", "alpha": 0.5},
-    "Ablation_No_MCTS": {"label": "w/o MCTS", "color": "#FF9800", "ls": ":", "alpha": 0.5},
-    "Ablation_No_LLMKT": {"label": "w/o LLMKT", "color": "#9C27B0", "ls": ":", "alpha": 0.5},
-    "Socrat_Full": {"label": "SocratMCTS (Ours)", "color": "#E53935", "ls": "-", "alpha": 0.8, "lw": 2.5}
+    "Vanilla_Prompting": {"label": "Vanilla (Baseline)", "color": "#9E9E9E", "ls": "--", "alpha": 0.0, "lw": 1.5},
+    "TreeInstruct_Baseline": {"label": "TreeInstruct", "color": "#2196F3", "ls": "-.", "alpha": 0.15, "lw": 2.0},
+    "Ablation_No_MCTS": {"label": "w/o MCTS", "color": "#FF9800", "ls": ":", "alpha": 0.15, "lw": 2.0},
+    "Ablation_No_LLMKT": {"label": "w/o LLMKT", "color": "#9C27B0", "ls": ":", "alpha": 0.15, "lw": 2.0},
+    "Socrat_Full": {"label": "SocratMCTS (Ours)", "color": "#E53935", "ls": "-", "alpha": 0.3, "lw": 3.0} 
 }
 
-# Translated Persona Labels
 PERSONAS = {
     "normal": "Normal Persona",
     "zero_base": "Zero-Base Persona",
@@ -54,7 +53,7 @@ def load_data():
     return pd.DataFrame(all_records).groupby(['mode', 'persona']).mean().reset_index()
 
 # ==========================================
-# 2. Generate Charts for Each Persona
+# 2. 生成 单画像雷达图 
 # ==========================================
 def generate_persona_charts():
     df = load_data()
@@ -64,59 +63,94 @@ def generate_persona_charts():
     angles += angles[:1]
     
     for persona_key, persona_title in PERSONAS.items():
-        fig = plt.figure(figsize=(14, 6))
+        fig = plt.figure(figsize=(8, 8))
         
-        # --- Left: Radar Chart ---
-        ax_radar = fig.add_subplot(1, 2, 1, polar=True)
-        ax_radar.set_theta_offset(np.pi / 2)
+        # --- 雷达图绘制 ---
+        ax_radar = fig.add_subplot(1, 1, 1, polar=True)
+        ax_radar.set_theta_offset(np.pi / 2) # 设置 12 点钟为起点 (NDAR)
         ax_radar.set_theta_direction(-1)
         ax_radar.set_xticks(angles[:-1])
-        ax_radar.set_xticklabels(METRIC_LABELS, fontsize=11)
+        
+        # 为 X 轴标签加粗
+        ax_radar.set_xticklabels(METRIC_LABELS, fontsize=12, fontweight='bold')
         ax_radar.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
         ax_radar.set_yticklabels(["0.2", "0.4", "0.6", "0.8", "1.0"], color="grey", size=9)
         ax_radar.set_ylim(0, 1.05)
-        
-        # --- Right: Bar Chart ---
-        ax_bar = fig.add_subplot(1, 2, 2)
-        
-        bar_x = np.arange(len(MODES_CONFIG))
-        bar_y = []
-        bar_colors = []
-        bar_labels = []
         
         for i, (mode, config) in enumerate(MODES_CONFIG.items()):
             row = df[(df['mode'] == mode) & (df['persona'] == persona_key)]
             if row.empty: continue
             
-            # Draw radar line
+            # --- 绘制雷达图数据 ---
             values = row[RADAR_METRICS].values.flatten().tolist()
             values += values[:1]
-            ax_radar.plot(angles, values, linewidth=config.get('lw', 1.5), linestyle=config['ls'], color=config['color'], label=config['label'])
-            ax_radar.fill(angles, values, color=config['color'], alpha=0.05)
+            zorder = 10 if mode == "Socrat_Full" else 5
             
-            # Collect bar data
-            bar_y.append(row['kl_shift'].values[0])
-            bar_colors.append(config['color'])
-            bar_labels.append(config['label'])
+            ax_radar.plot(angles, values, linewidth=config.get('lw', 1.5), linestyle=config['ls'], color=config['color'], label=config['label'], zorder=zorder)
+            if config['alpha'] > 0:
+                ax_radar.fill(angles, values, color=config['color'], alpha=config['alpha'], zorder=zorder-1)
 
-        # Draw bar chart
-        bars = ax_bar.bar(bar_x, bar_y, color=bar_colors, width=0.6)
-        ax_bar.bar_label(bars, fmt='%.2f', padding=3, fontsize=11)
-        ax_bar.set_xticks(bar_x)
-        ax_bar.set_xticklabels(bar_labels, rotation=15, ha='right', fontsize=10)
-        ax_bar.set_ylabel('Cognitive Gain (KL Shift)', fontsize=12, fontweight='bold')
-        ax_bar.set_title('Cognitive Tracking Performance (LLMKT)', fontsize=12)
-        
-        # Unified Title and Legend
-        fig.suptitle(f"System Performance Evaluation - {persona_title}", fontsize=16, fontweight='bold', y=1.05)
+        # 统一标题与图例
+        fig.suptitle(f"System Performance Evaluation\n{persona_title}", fontsize=16, fontweight='bold', y=1.02)
         handles = [Patch(facecolor=config['color'], label=config['label']) for config in MODES_CONFIG.values()]
-        fig.legend(handles=handles, loc='lower center', ncol=5, fontsize=11, bbox_to_anchor=(0.5, -0.05))
+        fig.legend(handles=handles, loc='lower center', ncol=3, fontsize=11, bbox_to_anchor=(0.5, -0.05))
         
         plt.tight_layout()
-        out_file = f"eval_{persona_key}.png"
+        out_file = f"eval_optimized_{persona_key}.png"
         plt.savefig(out_file, dpi=300, bbox_inches='tight')
-        print(f"✅ Generated chart: {out_file}")
+        print(f"✅ Generated Persona chart: {out_file}")
         plt.close(fig)
+
+# ==========================================
+# 3. 生成 全局鲁棒性对比柱状图 
+# ==========================================
+def generate_global_robustness_chart():
+    df = load_data()
+    if df.empty: return
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    personas_keys = list(PERSONAS.keys())
+    persona_labels = list(PERSONAS.values())
+    
+    # 指定仅对比的两个模式
+    modes_to_plot = ["Ablation_No_MCTS", "Socrat_Full"]
+
+    x = np.arange(len(personas_keys))
+    width = 0.3  
+
+    # 分组绘制柱状图
+    for i, mode in enumerate(modes_to_plot):
+        config = MODES_CONFIG[mode]
+        y_values = []
+        for p in personas_keys:
+            row = df[(df['mode'] == mode) & (df['persona'] == p)]
+            y_values.append(row['kl_shift'].values[0] if not row.empty else 0.0)
+            
+        # 计算每根柱子的偏移量
+        offset = (i - len(modes_to_plot)/2 + 0.5) * width
+        bars = ax.bar(x + offset, y_values, width, label=config['label'], color=config['color'], edgecolor='black', linewidth=0.8)
+        
+        # 在柱子上添加数值
+        ax.bar_label(bars, fmt='%.2f', padding=3, fontsize=11)
+
+    ax.set_ylabel('Cognitive Gain (KL Shift)', fontsize=13, fontweight='bold')
+    # 去掉了标题里的中文 "(全局鲁棒性分析)"
+    ax.set_title('MCTS Contribution Across Student Personas', fontsize=16, fontweight='bold', pad=20)
+    ax.set_xticks(x)
+    ax.set_xticklabels(persona_labels, fontsize=12, fontweight='bold')
+    ax.grid(axis='y', linestyle='--', alpha=0.7)
+
+    # 图例配置
+    handles = [Patch(facecolor=MODES_CONFIG[m]['color'], label=MODES_CONFIG[m]['label']) for m in modes_to_plot]
+    ax.legend(handles=handles, title='System Architecture', bbox_to_anchor=(1.02, 1), loc='upper left')
+
+    plt.tight_layout()
+    out_file = "eval_global_robustness.png"
+    plt.savefig(out_file, dpi=300, bbox_inches='tight')
+    print(f"✅ Generated Global Robustness chart: {out_file}")
+    plt.close(fig)
 
 if __name__ == "__main__":
     generate_persona_charts()
+    generate_global_robustness_chart()

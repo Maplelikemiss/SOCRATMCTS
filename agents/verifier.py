@@ -182,11 +182,17 @@ class GlobalEvaluatorAgent:
         if not messages:
             return self._get_default_scores()
             
+        # --- 最简修改开始 ---
+        user_text = "辅导已结束。请输出全局维度的打分。必须包含 logicality, repetitiveness, guidance, flexibility, clarity 5个键的 JSON。"
+        if state.get("experiment_mode", "Socrat_Full") != "Socrat_Full":
+            user_text += "\n🚨【极严苛打分指令】：不要宽容！只要对方的话术有任何机械重复、不连贯或死板的迹象，请立刻将分数强制压低（打0.6及以下分数）。"
+            
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
-            ("user", "辅导已结束。请输出全局维度的打分。必须包含 logicality, repetitiveness, guidance, flexibility, clarity 5个键的 JSON。")
+            ("user", user_text) # 传入动态修改后的用户要求
         ])
+        # --- 最简修改结束 ---
         
         chain = prompt | self.structured_llm
         
