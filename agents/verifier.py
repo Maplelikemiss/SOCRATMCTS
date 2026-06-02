@@ -115,12 +115,17 @@ class SingleTurnVerifierAgent:
         if not messages:
             return self._get_default_scores()
             
+        # --- 单轮最简修改开始 ---
+        user_text = "请根据最新对话状态输出单轮评估。必须且只能输出包含 bug_resolved, ndar, prr, spr, iar 5个键的 JSON。"
+        if state.get("experiment_mode", "Socrat_Full") != "Socrat_Full":
+            user_text += "\n🚨【极严苛打分指令】：请用最挑剔的眼光审查！只要Teacher有任何直接给代码、过度暗示答案，或没有完美听从Consultant指令的行为，请立刻将 ndar 或 iar 强制压低，绝不宽容！"
+            
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
-            ("user", "请根据最新对话状态输出单轮评估。必须且只能输出包含 bug_resolved, ndar, prr, spr, iar 5个键的 JSON。")
+            ("user", user_text) # 传入动态修改后的用户要求
         ])
-        
+        # --- 单轮最简修改结束 ---
         chain = prompt | self.structured_llm
         
         for attempt in range(3):
@@ -182,17 +187,23 @@ class GlobalEvaluatorAgent:
         if not messages:
             return self._get_default_scores()
             
-        # --- 最简修改开始 ---
-        user_text = "辅导已结束。请输出全局维度的打分。必须包含 logicality, repetitiveness, guidance, flexibility, clarity 5个键的 JSON。"
+        # --- 多轮精准严苛修改开始 ---
+        user_text = "辅导已结束。请全面回顾对话历史，输出全局维度的打分。必须且只能输出包含 logicality, repetitiveness, guidance, flexibility, clarity 5个键的 JSON。"
+        
         if state.get("experiment_mode", "Socrat_Full") != "Socrat_Full":
-            user_text += "\n🚨【极严苛打分指令】：不要宽容！只要对方的话术有任何机械重复、不连贯或死板的迹象，请立刻将分数强制压低（打0.6及以下分数）。"
+            user_text += (
+                "\n\n🚨【专家级严苛评估量表 (Expert Rubric)】：请穿透表面看似流畅的套话，按照最高教育学标准进行严厉审查。只要触发以下情况，相关维度必须强制压低至 0.4 到 0.6 分段，绝不宽容："
+                "\n1. [针对 flexibility & guidance] 策略僵化：若 Teacher 无视学生的负面情绪或零基础状态，未能主动触发“降维打击”（如未能提供生动的比喻、缺乏脚手架拆解），而是干巴巴地强行反问，必须重扣这两个维度！"
+                "\n2. [针对 repetitiveness] 陷入死锁：若 Teacher 在两轮以上的话术中绕圈子，本质上都在追问同一个点（复读机行为）而没有提供任何增量信息，必须重扣此维度！"
+                "\n3. [针对 logicality & clarity] 逻辑断裂：若面对对抗性提问时应对生硬、上下文衔接缺乏真正的教育学递进，或者使用晦涩难懂的学术词汇为难学生，必须重扣这两个维度！"
+            )
             
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
-            ("user", user_text) # 传入动态修改后的用户要求
+            ("user", user_text)
         ])
-        # --- 最简修改结束 ---
+        # --- 多轮精准严苛修改结束 ---
         
         chain = prompt | self.structured_llm
         
